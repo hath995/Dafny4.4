@@ -185,6 +185,15 @@ lemma CompletenessAxiomLower(A: iset<real>, a: real)
     // ensures exists k: real :: greatestLeastBound(A, k) && lowerBound(A, k)
     ensures exists k: real :: inf(A, k)
 
+lemma xSquare(x: real, y: real)
+    requires x > 1.0
+    requires x > y
+    ensures x*x > y
+{
+    assert x > y;
+    assert x *x > x;
+}
+
 //https://proofwiki.org/wiki/Existence_of_Square_Roots_of_Positive_Real_Number
 lemma sqrtExists(r: real)
     requires r > 0.0
@@ -212,11 +221,42 @@ lemma sqrtExists(r: real)
     CompletenessAxiomUpper(S,r+1.0);
     var u :| sup(S, u);
     if u*u > r {
+        assert u > 0.0;
+        assert u*u > u;
+        assert u > r by {
+            // if u < r {
+            //     var diff := r - u;
+            //     assert 0.0 < diff  < r;
+            //     assert u+diff == r;
+            //     assert false;
+            // }
+        }
         ArchimedeanPrinciple((u*u-r)/(2.0*u));
         var n: pos :| 1.0/(n as real) < (u*u-r)/(2.0*u);
         var u' := (u-1.0/(n as real));
         assert u' == sub(u,1.0/(n as real));
-        assume upperBound(S, u');
+        calc{
+            u'*u';
+            (u-1.0/(n as real))*(u-1.0/(n as real));
+            u*u-(2.0*u/(n as real))+1.0/((n as real)*(n as real));
+        }
+        assert (u-1.0/(n as real))*(u-1.0/(n as real)) > u*u-(2.0*u/(n as real));
+        assert u*u-(2.0*u/(n as real)) > r by {
+            assert (n as real) >= 1.0;
+            assert u > 0.0;
+            calc {
+                1.0/(n as real) < (u*u-r)/(2.0*u);
+                (2.0*u)*(1.0/(n as real)) < (2.0*u)*((u*u-r)/(2.0*u));
+            }
+        }
+        // assert u'*u' > r;
+        // assert upperBound(S, u') by {
+        //     forall x | x in S
+        //         ensures x <= u'
+        //     {
+        //         assert x*x < r < u';
+        //     }
+        // }
         assert false;
     }
     if u*u < r {
@@ -505,7 +545,9 @@ lemma exercise1_29b(A: iset<real>)
     {
         var n: nat :| x == e29(n);
         if n == 1 {
-
+            assert x == 1.0/2.0;
+        }else{
+            assert (n as real)/(n as real + 1.0) >= 1.0/2.0;
         }
     }
     assert lowerBound(A, 1.0/2.0);
@@ -781,7 +823,7 @@ lemma TwoNminusTwoOverFiveNPlusOneN(n: pos, N: pos, epsilon: real)
 {}
 
 lemma {:verify } exercise3_4b() 
-    ensures Limit(TwoNminusTwoOverFiveNPlusOne, 2.0/5.0);
+    ensures Limit(TwoNminusTwoOverFiveNPlusOne, 2.0/5.0)
 {
 
     forall epsilon: real | positiveReal(epsilon)
@@ -1378,6 +1420,11 @@ lemma sqrtSeqLessAll(a: real, n: pos, m: pos)
 //     }
 // }
 
+lemma real1(a: real)
+    requires a >= 1.0
+    ensures a/a == 1.0
+{}
+
 lemma sqrtSeqMonotonic(a: real)
     requires a >= 1.0
     ensures MonotonicDecreasingSequence(sqrtSeq(a))
@@ -1389,17 +1436,26 @@ lemma sqrtSeqMonotonic(a: real)
         if n == 1 {
             if m == 2 {
                 calc {
+                    sseq(n);
                     sseq(1);
                     a;
                 }
+                real1(a);
+                assert a/a == 1.0;
                 calc {
+                    sseq(m);
                     sseq(2);
                     (a+a/a)/2.0;
+                    (a+1.0)/2.0;
                 }
-                assert a >= (a+1.0)/2.0;
-            assert sseq(n) >= sseq(m);
+                // assert a >= (a+1.0)/2.0;
+                // assert sseq(1) >= a >=  (a+1.0)/2.0 >= sseq(2) ;
+                // assert sseq(1) == sseq(n);
+                // assert sseq(2) == sseq(m);
+                assert sseq(n) >= sseq(m);
             }else{
-            assert sseq(n) >= sseq(m);
+                assert m > 2;
+                assert sseq(n) >= sseq(m);
             }
         }else{
 
