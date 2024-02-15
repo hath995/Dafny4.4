@@ -185,17 +185,22 @@ lemma CompletenessAxiomLower(A: iset<real>, a: real)
     // ensures exists k: real :: greatestLeastBound(A, k) && lowerBound(A, k)
     ensures exists k: real :: inf(A, k)
 
-lemma xSquare(x: real, y: real)
-    requires x > 1.0
-    requires x > y
-    ensures x*x > y
+lemma uGreater(u: real, r: real)
+    requires u > 0.0 && r > 0.0
+    requires u*u > r*r
+    ensures u > r
 {
-    assert x > y;
-    assert x *x > x;
+    if u >= 1.0 {
+    }else{
+        // assert 0.0 < u < 1.0;
+        // multLte(u, 1.0, u);
+        // assert u*u < u*1.0;
+        // assert u * u < u;
+    }
 }
 
 //https://proofwiki.org/wiki/Existence_of_Square_Roots_of_Positive_Real_Number
-lemma sqrtExists(r: real)
+lemma {:vcs_split_on_every_assert} sqrtExists(r: real)
     requires r > 0.0
     ensures exists y :: r == y * y
 {
@@ -222,41 +227,48 @@ lemma sqrtExists(r: real)
     var u :| sup(S, u);
     if u*u > r {
         assert u > 0.0;
-        assert u*u > u;
-        assert u > r by {
-            // if u < r {
-            //     var diff := r - u;
-            //     assert 0.0 < diff  < r;
-            //     assert u+diff == r;
-            //     assert false;
-            // }
-        }
         ArchimedeanPrinciple((u*u-r)/(2.0*u));
+        assert 0.0 < (u*u-r)/(2.0*u);
         var n: pos :| 1.0/(n as real) < (u*u-r)/(2.0*u);
         var u' := (u-1.0/(n as real));
         assert u' == sub(u,1.0/(n as real));
+        calc {
+            u-(u*u-r)/(2.0*u);
+            (2.0*u)*u/(2.0*u)-(u*u-r)/(2.0*u);
+            ((2.0*u)*u-(u*u-r))/(2.0*u);
+            (u*u+r)/(2.0*u);
+        }
+        assert 0.0 < 1.0/(n as real) < u;
+        assert u' > 0.0;
         calc{
             u'*u';
             (u-1.0/(n as real))*(u-1.0/(n as real));
             u*u-(2.0*u/(n as real))+1.0/((n as real)*(n as real));
         }
-        assert (u-1.0/(n as real))*(u-1.0/(n as real)) > u*u-(2.0*u/(n as real));
+       
+        assert u'*u' > u*u-(2.0*u/(n as real));
         assert u*u-(2.0*u/(n as real)) > r by {
             assert (n as real) >= 1.0;
             assert u > 0.0;
             calc {
                 1.0/(n as real) < (u*u-r)/(2.0*u);
+                {multLte((1.0/(n as real)),((u*u-r)/(2.0*u)),2.0*u);}
                 (2.0*u)*(1.0/(n as real)) < (2.0*u)*((u*u-r)/(2.0*u));
             }
         }
-        // assert u'*u' > r;
-        // assert upperBound(S, u') by {
-        //     forall x | x in S
-        //         ensures x <= u'
-        //     {
-        //         assert x*x < r < u';
-        //     }
-        // }
+        assert u'*u' > r;
+        assert upperBound(S, u') by {
+            forall x | x in S
+                ensures x < u'
+            {
+                assert x*x < r < u'*u';
+                assert x*x < u'*u';
+                if x <= 0.0 {
+                }else{
+                    uGreater(u',x);
+                }
+            }
+        }
         assert false;
     }
     if u*u < r {
