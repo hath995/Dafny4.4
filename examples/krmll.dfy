@@ -2,21 +2,39 @@
 
 module krml190 {
 
+    function toMultiset<T>(node: Node?<T>): multiset<T>
+        reads set x | node != null && x in node.footprint
+        requires node != null ==> node.Valid()
+        decreases if node == null then {} else node.footprint
+    {
+       if node == null then multiset{} else
+       assert node.Valid();
+       multiset{node.data}+toMultiset(node.next) 
+    }
+
     class Node<T(==)> {
         ghost var list: seq<T>
+        ghost var parent: Node?<T>
         ghost var footprint: set<Node<T>>
+        ghost var ancestorRepr: set<Node<T>>
 
         var data: T
         var next: Node?<T>
 
-        constructor(d: T) 
+        constructor(d: T, ghost parent: Node?<T>) 
+            // requires parent != null ==> parent.AncestorValid()
             ensures this.data == d
             ensures this.list == [d]
+            ensures this.parent == parent
             ensures Valid()
+            // ensures AncestorValid()
         {
             this.data := d;
             this.list := [d];
             this.next := null;
+            this.parent := parent;
+            // this.parent.next := this;
+            this.ancestorRepr := if parent == null then {} else {parent}+parent.ancestorRepr;
             this.footprint := {this};
         }
 
@@ -35,6 +53,20 @@ module krml190 {
                 )
         }
 
+        ghost predicate AncestorValid() 
+            reads this, ancestorRepr
+            decreases ancestorRepr
+        {
+            this !in ancestorRepr &&
+            (parent == null ==> ancestorRepr == {}) &&
+            (parent != null ==> 
+                parent in ancestorRepr &&
+                ancestorRepr == {parent}+parent.ancestorRepr && 
+                (parent !in parent.ancestorRepr) &&
+                parent.next == this &&
+                (parent.parent != null ==> parent.AncestorValid()))
+        }
+
         method SkipHead() returns (r: Node?<T>)
             requires Valid()
             ensures r == null ==> |list| == 1
@@ -48,11 +80,25 @@ module krml190 {
             requires Valid()
             ensures r.Valid() && fresh(r.footprint-old(footprint))
             ensures r.list == [d]+list
+            ensures multiset(r.list) == multiset(list)+multiset{d}
         {
-            r := new Node(d);
+            r := new Node(d, null);
             r.next := this;
             r.footprint := {r}+footprint;
             r.list := [d]+r.next.list;
+        }
+
+        method InsertAfter(d: T) returns (head: Node<T>)
+            requires Valid()
+            requires AncestorValid()
+            ensures head.Valid()
+            ensures fresh(head.footprint - old(footprint)-old(ancestorRepr))
+        {
+            if head.parent == null {
+                
+            }else{
+
+            }
         }
 
         method ReverseInPlace() returns (reverse: Node<T>)
