@@ -129,6 +129,7 @@ lemma biggerDenominatorReal(bigger: real, smaller: real)
                     assert converges(TwoNminusTwoOverFiveNPlusOne, n, epsilon, 2.0/5.0);
                 }
             }else{
+                assert 0.0 < epsilon < 1.0;
                 var N: nat := ((12.0/epsilon-5.0)/25.0).Floor+1;
                 assert positiveNat(N);
 
@@ -181,6 +182,8 @@ lemma biggerDenominatorReal(bigger: real, smaller: real)
                     assert converges(TwoNminusTwoOverFiveNPlusOne, n, epsilon, 2.0/5.0);
                 }
             }
+
+            assert exists N: nat :: positiveNat(N) && forall n: pos :: n > N ==> converges(TwoNminusTwoOverFiveNPlusOne, n, epsilon, 2.0/5.0);
         }
     }
 
@@ -275,12 +278,12 @@ lemma biggerDenominatorReal(bigger: real, smaller: real)
                 {
 
                     assert converges(a_i, n, epsilonOverC, a);
-                    // calc {
-                    //     abs(mulSequence(a_i, c)(n)-prod(c,a));
-                    //     abs(prod(c,a_i(n))-prod(c,a));
-                    //     abs(c*a_i(n)-c*a);
-                    //     abs(c*(a_i(n)-a));
-                    // }
+                    calc {
+                        abs(mulSequence(a_i, c)(n)-prod(c,a));
+                        abs(prod(c,a_i(n))-prod(c,a));
+                        abs(c*a_i(n)-c*a);
+                        abs(c*(a_i(n)-a));
+                    }
                     var dist := abs(a_i(n)-a);
                     assert 0.0 <= dist < epsilonOverC;
                     // inequalitProduct(dist, epsilonOverC, c);
@@ -353,11 +356,44 @@ lemma biggerDenominatorReal(bigger: real, smaller: real)
         }
     }
 
-    lemma {:verify false} exercise3_13(a_i: pos -> real, b_i: pos -> real, a: real, b: real)
+    lemma {:verify } exercise3_13(a_i: pos -> real, b_i: pos -> real, a: real, b: real)
         requires Limit(a_i, a)
         requires Limit(b_i, b)
-        ensures Limit(subSequence(a_i, b_i), a-b)
+        ensures Limit(subtractSequence(a_i, b_i), a-b)
     {
         // exercise3_8(a_i, b_i, a, b);
+        forall epsilon: real | positiveReal(epsilon)
+            ensures exists N: nat :: positiveNat(N) && forall n: pos :: n > N ==> converges(subtractSequence(a_i, b_i), n, epsilon, a-b)
+        {
+            var epsilonOver2 := epsilon/2.0;
+            assert positiveReal(epsilonOver2);
+            var a_n :| positiveNat(a_n) && forall n: pos :: n > a_n ==> converges(a_i, n, epsilonOver2, a);
+            var b_n :| positiveNat(b_n) && forall n: pos :: n > b_n ==> converges(b_i, n, epsilonOver2, b);
+            var c_n := maxNat(a_n, b_n);
+            forall n: nat | n > c_n
+                ensures converges(subtractSequence(a_i, b_i), n, epsilon, a-b)
+            {
+                assert n > c_n >= a_n;
+                assert n > c_n >= b_n;
+                assert converges(a_i, n, epsilonOver2, a);
+                assert converges(b_i, n, epsilonOver2, b);
+                // assert abs(a_i(n)-a) < epsilonOver2;
+                // assert abs(b_i(n)-b) < epsilonOver2;
+                // assert abs(subtractSequence(a_i, b_i)(n)-(a-b)) < epsilon;
+                // calc{
+                //     abs(-b_i(n)+b);
+                //     abs(b_i(n)-b);
+                // }
+                // calc{
+                //     abs(subtractSequence(a_i, b_i)(n)-(a-b));
+                //     abs(a_i(n)-b_i(n)-(a-b));
+                //     abs(a_i(n)-b_i(n)-a+b);
+                //     abs(a_i(n)-a-b_i(n)+b);
+                // }
+                // assert abs(a_i(n)-a-b_i(n)+b) <= abs(a_i(n)-a)+abs(-b_i(n)+b);
+                // assert abs(a_i(n)-a)+abs(-b_i(n)+b) == abs(a_i(n)-a)+abs(b_i(n)-b);
+                // assert abs(a_i(n)-a)+abs(b_i(n)-b) < epsilonOver2 + epsilonOver2 <= epsilon;
+            }
+        }
     }
 }

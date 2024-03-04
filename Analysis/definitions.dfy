@@ -70,7 +70,7 @@ module Analysis {
         (n:pos) => prod(a_i(n) , b_i(n))
     }
 
-    function subSequence(a_i: pos -> real, b_i: pos -> real): pos -> real {
+    function subtractSequence(a_i: pos -> real, b_i: pos -> real): pos -> real {
         (n:pos) => a_i(n) - b_i(n)
     }
 
