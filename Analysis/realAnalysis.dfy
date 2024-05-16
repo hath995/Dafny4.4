@@ -460,7 +460,7 @@ lemma sqrtSeqLessAll(a: real, n: pos, m: pos)
 // }
 
 lemma real1(a: real)
-    requires a >= 1.0
+    requires a != 0.0
     ensures a/a == 1.0
 {}
 
