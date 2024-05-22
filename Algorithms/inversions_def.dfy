@@ -771,9 +771,37 @@ module InversionDefs {
                         assert x.1 >= |xs|+1;
                     }
                 }
-                assume JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|);
-                assume JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
-                assume pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                assert JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) by {
+                    forall x | x in JoinedWith(xs, ys[..i], k)
+                        ensures x !in pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|)
+                    {
+                        if x in pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) {
+
+                            pairSetRmapInverse(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|, x);
+                        }
+
+                    }
+                }
+                assert JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) by {
+                    forall x | x in JoinedWith(xs, ys[..i], k)
+                        ensures x !in pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)
+                    {
+                        if x in pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) {
+
+                            pairSetRmapInverse(JoinedWith(xs, [ys[i]], k), |ys[..i]|, x);
+                        }
+
+                    }
+                }
+                assert pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) by {
+                    forall x | x in pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|)
+                        ensures x !in pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)
+                    {
+                        if x in pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) {
+                            pairSetRmapInverse(JoinedWith(xs, [ys[i]], k), |ys[..i]|,x);
+                        }
+                    }
+                }
                 calc {
                     JoinedWith(xs, ys, k);
                     JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
@@ -815,7 +843,16 @@ module InversionDefs {
                     JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|);
                 }
 
-                assume JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|);
+                assert JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|) by {
+                    forall x | x in JoinedWith(xs, ys[..i], k)
+                        ensures x !in pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|)
+                    {
+                        if x in pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|) {
+                            pairSetRmapInverse(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|, x);
+
+                        }
+                    }
+                }
                 calc {
                     |JoinedWith(xs, ys, k)|;
                     {assert JoinedWith(xs, ys, k)  == JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);}
