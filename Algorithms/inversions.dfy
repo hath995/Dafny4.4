@@ -13,94 +13,6 @@ module Inversions {
     }
 
     //{:vcs_split_on_every_assert}
-    lemma PiecesEqual(xs: seq<int>, ys: seq<int>, sxs: seq<int>, sys: seq<int>, k: int)
-        requires multiset(xs) == multiset(sxs)
-        requires multiset(ys) == multiset(sys)
-        requires Sorted(sxs)
-        requires Sorted(sys)
-        requires |sxs| > 0
-        requires |sxs| == |xs|
-        requires 0 <= k < |xs| && xs[k] == sxs[0]
-        requires |inversersionSetJoined(xs[0..k] + xs[k+1..], ys)| == |inversersionSetJoined(sxs[1..], sys)|
-        ensures |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)| == |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|
-    {
-        pairSetMap2Lemma(inversersionSetJoined(sxs[1..], sys),1);
-        pairKMapSize(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1);
-    }
-
-    lemma  inversetConcatOrderedUnorderedSame(xs: seq<int>, ys: seq<int>, sxs: seq<int>, sys: seq<int>)
-        requires multiset(xs) == multiset(sxs)
-        requires multiset(ys) == multiset(sys)
-        requires Sorted(sxs)
-        requires Sorted(sys)
-        ensures |inversersionSetJoined(xs, ys)| == |inversersionSetJoined(sxs, sys)|
-    {
-        var n := |xs| + |ys|;
-        var xsys := xs + ys;
-        assert |xsys| == n;
-        var sxsys := sxs + sys;
-        seqMsLength(xs, sxs);
-        seqMsLength(ys, sys);
-        assert |sxsys| == n;
-        assert multiset(xsys) == multiset(sxsys);
-        var invs := inversersionSetJoined(xs, ys);
-        if sxs == [] {
-            assert xs == [];
-            assert inversersionSetJoined(xs, ys) == {};
-            assert |inversersionSetJoined(xs, ys)| == 0;
-            assert |inversersionSetJoined(xs, ys)| == |inversersionSetJoined(sxs, sys)|;
-        }else {
-            assert |sxs| > 0;
-            var x := sxs[0];
-            assert sxs == [x] + sxs[1..];
-            assert x in multiset(xs);
-            var k :| 0 <= k < |xs| && x == xs[k];
-            assert xs == xs[0..k] + [x] + xs[k+1..];
-            assert multiset(xs) == multiset(xs[0..k] + [x] + xs[k+1..]);
-            calc {
-                multiset(sxs[1..]);
-                multiset(sxs)-multiset{x};
-                multiset(xs)-multiset{x};
-                multiset(xs[0..k] + xs[k+1..]);
-            }
-            assert multiset(xs[0..k] + xs[k+1..]) == multiset(sxs[1..]);
-            inversetConcatOrderedUnorderedSame(xs[0..k] + xs[k+1..], ys, sxs[1..], sys);
-            assert |inversersionSetJoined(xs[0..k] + xs[k+1..], ys)| == |inversersionSetJoined(sxs[1..], sys)|;
-            var sortedInvs := inversersionSetJoined(sxs, sys);
-            var sxsFirst := JoinedWith(sxs, sys, 0);
-            inversersionSetJoinedFirsts(sxs, sys);
-            assert sxsFirst <= sortedInvs;
-            // assume sxsFirst !! pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1);
-            assert sxsFirst + pairSetMap2(inversersionSetJoined(sxs[1..], sys),1) == inversersionSetJoined(sxs, sys);
-            assert sxsFirst !! pairSetMap2(inversersionSetJoined(sxs[1..], sys),1) by {
-                forall pair | pair in pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)
-                    ensures pair.0 != 0
-                {
-                    pairSetMap2Inverse(inversersionSetJoined(sxs[1..], sys), 1, pair);
-                }
-            }
-            assert pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1) == inversersionSetJoined(sxs, sys) - sxsFirst;
-            var xsRest := JoinedWith(xs, ys, k);
-            inversionSetJoinedMiddle2(xs, ys, k);
-            assert xsRest + pairKMap(inversersionSetJoined(xs[0..k]+xs[k+1..], ys),k,1) == inversersionSetJoined(xs, ys);
-            assert xsRest !! pairKMap(inversersionSetJoined(xs[0..k]+xs[k+1..], ys),k,1);
-            assert pairKMap(inversersionSetJoined(xs[0..k]+xs[k+1..], ys),k,1) == inversersionSetJoined(xs, ys) - xsRest;
-
-            // assert xsRest <= invs;
-            something(xs, ys, sxs, sys, k);
-            assert |JoinedWith(sxs, sys, 0)| == |JoinedWith(xs, ys, k)|;
-            assert |invs| == |xsRest| + |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)|;
-            assert |sortedInvs| == |sxsFirst| + |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|;
-            assert |xsRest| == |sxsFirst|;
-            PiecesEqual(xs, ys, sxs, sys, k);
-            assert |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)| == |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|;
-            assert |invs| == |sortedInvs|;
-            assert |inversersionSetJoined(xs, ys)| == |inversersionSetJoined(sxs, sys)|;
-        }
-        
-    }
-
-
 
     method BruteForceCount(xs: seq<int>) returns (numInv: int)
         requires |xs| > 1
@@ -136,8 +48,8 @@ module Inversions {
         assert inversions == inversionSet(xs);
     }
 
-// //Tim Roughgarden's algorithms illuminated part 1 page 64
-    method {:verify } {:vcs_split_on_every_assert} SortAndCountInv(xs: seq<int>) returns (sortedXs: seq<int>, numInv: int)
+//Tim Roughgarden's algorithms illuminated part 1 page 64
+    method SortAndCountInv(xs: seq<int>) returns (sortedXs: seq<int>, numInv: int)
         ensures numInv == countInversion(xs)
         ensures multiset(sortedXs) == multiset(xs)
         ensures Sorted(sortedXs)
@@ -174,14 +86,11 @@ module Inversions {
         }
     }
 
-
-
-    method {:verify }  MergeAndCountInv(left: seq<int>, right: seq<int>) returns (merged: seq<int>, splitInv: int)
+    method MergeAndCountInv(left: seq<int>, right: seq<int>) returns (merged: seq<int>, splitInv: int)
         requires Sorted(left)
         requires Sorted(right)
         ensures |merged| == |left| + |right|
         ensures multiset(merged) == multiset(left + right)
-        // ensures splitInv == countInversion(merged)
         ensures splitInv == |inversersionSetJoined(left, right)|
         ensures Sorted(merged)
     {
@@ -200,11 +109,7 @@ module Inversions {
             invariant 0 <= i <= |left|
             invariant 0 <= j <= |right|
             invariant |merged| == k
-            // invariant inversions == inversersionSetJoined(left[0..i], right[0..j])
-            // invariant inv == countInversion(merged)
             invariant multiset(merged) == multiset(left[0..i] + right[0..j])
-
-            // invariant forall x :: 0 <= x < |merged| ==> merged[x] <= right[j];
             invariant forall x :: x in merged ==> x in left[..i] || x in right[..j]
             invariant forall x, y :: x in merged && y in left[i..]+right[j..] ==> x <= y
             invariant Sorted(merged)
@@ -272,7 +177,6 @@ module Inversions {
                 i := i + 1;
                 assert inv == |inversersionSetJoined(left, right[0..j])|;
             }else{
-                // assume forall x :: 0 <= x < |merged| ==> merged[x] <= right[j];
                 assert forall x :: 0 <= x < |merged| ==> merged[x] <= right[j] by {
                     assert right[j] in left[i..]+right[j..];
                     forall x | 0 <= x < |merged|
@@ -292,8 +196,6 @@ module Inversions {
             }
             k := k + 1;
             print "after: i: ",i," j: ",j, " inv: ", inv," ", inversersionSetJoined(left, right[..j]), " |_|=", |inversersionSetJoined(left, right[..j])|, "\n";
-
-            // assume inv == |inversersionSetJoined(left[0..i], right[0..j])|;
         }
         assert i == |left|;
         assert j == |right|;
