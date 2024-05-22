@@ -34,7 +34,7 @@ function MergeAndCountSplitInv(xs: number[], ys: number[]): [number, number[]] {
     let count = 0;
     while (k < n) {
         // console.log("i j", i, j, xs[i], ys[j]);
-        if (i < xs.length && xs[i] < ys[j] || j >= ys.length) {
+        if (i < xs.length && xs[i] <= ys[j] || j >= ys.length) {
             zs.push(xs[i]);
             i++;
         } else {
@@ -46,6 +46,7 @@ function MergeAndCountSplitInv(xs: number[], ys: number[]): [number, number[]] {
     }
     return [count, zs];
 }
-var sample = [1, 3, 5, 2, 4, 6];
+// var sample = [1, 3, 5, 2, 4, 6];
 // var sample = [4, 5, 6, 1, 2, 3];
+var sample = [1, 2, 5, 6, 7, 7, 8];
 console.log(SortAndCountInv(sample), countInversions(sample));

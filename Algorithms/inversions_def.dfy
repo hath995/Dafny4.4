@@ -25,11 +25,39 @@ module InversionDefs {
         set i, j | 0 <= i < |xs| && |xs| <= j < n && IsInverted(xsys, i, j) :: (i, j)
     }
 
+    function inversersionSetJoinedPartial(xs: seq<int>, ys: seq<int>, i: int, j: int): set<(int,int)> 
+        requires 0 <= i < |xs|
+        requires 0 <= j < |ys|
+    {
+        var n := |xs| + |ys|;
+        var xsys := xs + ys;
+        assert |xsys| == n;
+        set x, y | i <= x <= |xs| && |xs| <= y < j+|xs| <= n && IsInverted(xsys, x, y) :: (x, y)
+    }
+
     function JoinedWith(xs: seq<int>, ys: seq<int>, k: int): set<(int,int)> 
         requires 0 <= k < |xs|
     {
         set  j | |xs| <= j < |xs| + |ys| && IsInverted(xs + ys, k, j) :: (k, j)
     }
+
+    predicate PositivePairs(ss: set<(int, int)>) {
+        forall pair :: pair in ss ==> pair.1 >= 0
+    }
+
+    predicate PositivePairsK(ss: set<(int, int)>, k: int) {
+        forall pair :: pair in ss ==> pair.1 >= k
+    }
+    
+    lemma JoinedWithRightPairs(xs: seq<int>, ys: seq<int>, k: int)
+        requires 0 <= k < |xs|
+        ensures PositivePairs(JoinedWith(xs, ys, k))
+    {}
+
+    lemma rmappedPairs(ss: set<(int, int)>, i: int)
+        requires PositivePairs(ss)
+        ensures PositivePairsK(pairSetRmap(ss, i), i)
+    {}
 
     ghost function JoinedWith2(xs: seq<int>, ys: seq<int>, k: int): set<(int,int)> 
         requires 0 <= k < |xs|
@@ -43,7 +71,7 @@ module InversionDefs {
                 pairSetRmap(JoinedWith2(xs, ys[1..], k),1)
     }
 
-    lemma {:vcs_split_on_every_assert} JoinedWith2Size(xs: seq<int>, ys: seq<int>, k: int)
+    lemma JoinedWith2Size(xs: seq<int>, ys: seq<int>, k: int)
         requires 0 <= k < |xs|
         ensures ys == [] ==> |JoinedWith2(xs, ys, k)| == 0
         ensures ys != [] && IsInverted(xs+ys, k, |xs|) ==> |JoinedWith2(xs, ys, k)| == 1+|pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|
@@ -96,9 +124,49 @@ module InversionDefs {
     }
 
     function pairKMap(ss: set<(int, int)>, k: int, i: int): set<(int, int)> 
+        requires 0 <= k
+        requires 0 < i
     {
         (set pair | pair in ss && pair.0 < k :: (pair.0, pair.1 + i)) +
         set pair | pair in ss && pair.0 >= k :: (pair.0 + i, pair.1 + i)
+    }
+
+    lemma KmapSeparate(ss: set<(int, int)>, k: int, i: int)
+        requires 0 <= k
+        requires 0 < i
+        ensures (set pair | pair in ss && pair.0 < k :: (pair.0, pair.1 + i)) !! set pair | pair in ss && pair.0 >= k :: (pair.0 + i, pair.1 + i)
+    {
+
+    }
+
+    lemma {:vcs_split_on_every_assert} pairKMapSize(ss: set<(int, int)>, k: int, i: int) 
+        requires 0 <= k
+        requires 0 < i
+        ensures |pairKMap(ss, k, i)| == |ss|
+    {
+        if ss == {} {
+            assert |ss| == 0;
+            assert |pairKMap(ss, k, i)| == 0;
+        }else{
+            var x :| x in ss;
+            // KmapSeparate(ss, k, i);
+            assert ss == (ss-{x})+{x};
+            // pairKMapSize(ss-{x}, k, i);
+            if x.0 < k {
+
+                pairKMapSize(ss-{x}, k, i);
+                assert (x.0, x.1+i) in pairKMap(ss,k,i);
+                assert (x.0, x.1+i) !in pairKMap(ss-{x},k,i);
+                assert pairKMap(ss, k, i) == {(x.0, x.1+i)} + pairKMap(ss-{x},k,i);
+                assert |pairKMap(ss, k, i)| == 1 + |pairKMap(ss-{x},k,i)|;
+                assert |pairKMap(ss, k, i)| == |ss|;
+            }else{
+                pairKMapSize(ss-{x}, k, i);
+                assert pairKMap(ss, k, i) == {(x.0+i, x.1+i)} + pairKMap(ss-{x},k,i);
+                assert |pairKMap(ss, k, i)| == |ss|;
+            }
+
+        }
     }
 
     function pairSetMap(ss: set<(int, int)>, i: int): set<(int, int)> 
@@ -130,6 +198,21 @@ module InversionDefs {
     lemma seqMsLength(xs: seq<int>, ys: seq<int>)
         requires multiset(xs) == multiset(ys)
         ensures |xs| == |ys|
+    {
+        if xs == [] {
+
+        }else if |xs|==1 {
+            assert xs[0] in multiset(xs);
+            assert xs[0] == ys[0];
+        }else{
+            var x := xs[0];
+            assert xs == [xs[0]]+xs[1..];
+            assert x in multiset(xs);
+            assert x in multiset(ys);
+            var k :| 0<=k < |ys| && ys[k] == x;
+            assert ys == ys[0..k]+[x]+ys[k+1..];
+        }
+    }
 
     lemma forallPartial(xs: seq<int>, i: int, j: int) 
         requires 0 <= i < j < |xs|
@@ -524,6 +607,507 @@ module InversionDefs {
             }else{
                 JoinedWithConcat(xs, ys, k);
                 assert JoinedWith2(xs, ys, k) == pairSetRmap(JoinedWith2(xs, ys[1..], k),1);
+            }
+
+        }
+    }
+
+    lemma JoinedWith2HeadNotIn(xs:seq<int>, ys: seq<int>, k: int)
+        requires 0 <= k < |xs|
+        requires !IsInverted(xs+ys, k, |xs|)
+        ensures (k, |xs|) !in JoinedWith2(xs, ys, k)
+    {
+        if ys == [] {
+
+        }else{
+            assert JoinedWith2(xs, ys, k) == pairSetRmap(JoinedWith2(xs, ys[1..], k),1);
+            JoinedWithSame(xs, ys, k);
+        }
+    }
+    lemma {:verify }  JoinedWithSplit(xs: seq<int>, ys: seq<int>, i: int, k: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        requires 0 <= i <= |ys|
+        ensures JoinedWith(xs, ys, k) == JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|)
+    {
+        assert ys == ys[..i]+ys[i..];
+        assert xs+ys == xs+ys[..i]+ys[i..];
+        assert forall x :: x in JoinedWith(xs, ys, k) ==> x.1 < |xs|+i || x.1 >= |xs|+i;
+        forall pair | pair in JoinedWith(xs, ys, k)
+            ensures pair in JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|)
+        {
+            if pair.1 < |xs|+i {
+                assert pair in JoinedWith(xs, ys[..i], k);
+            }else{
+                // JoinedWithRightPairs(xs, ys[1..], k);
+                // rmappedPairs(JoinedWith(xs, ys[i..], k), |ys[..i]|);
+                // assert pair.1 < |xs|+|ys|;
+                var yi := pair.1-|ys[..i]|;  
+                // assert 0 <= yi < |xs|+|ys|-|ys[..i]|;
+                // var rest := xs+ys[i..];
+                // assert |rest| == |xs|+|ys|-|ys[..i]|;
+                // assert (xs+ys)[pair.1] == rest[yi];
+                // assert (xs+ys)[pair.0] == rest[pair.0];
+                // assert IsInverted(rest, pair.0, yi);
+                // assert (pair.0, yi) in JoinedWith(xs, ys[i..], k);
+                assert rmap((pair.0, yi), |ys[..i]|) == pair;
+
+                assert pair in pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
+            }
+        }
+
+        forall pair | pair in JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|)
+            ensures pair in JoinedWith(xs, ys, k)
+        {
+            if pair in JoinedWith(xs, ys[..i], k) {
+                assert pair in JoinedWith(xs, ys, k);
+
+            }else{
+                // assert pair !in JoinedWith(xs, ys[..i], k);
+                // assert pair in pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
+                pairSetRmapInverse(JoinedWith(xs, ys[i..], k), |ys[..i]|, pair);
+                assert pair in JoinedWith(xs, ys, k);
+
+            }
+        }
+    }
+
+    lemma JoinedWithConcatSeq(xs: seq<int>, ys: seq<int>, ws: seq<int>, k: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        ensures JoinedWith(xs, ys+ws, k) == JoinedWith(xs, ys, k) + JoinedWith(xs+ys, ws, k)
+    {
+        assert (xs+ys)+ws == xs+(ys+ws);
+    }
+    
+    lemma JoinedWith4Concat(xs: seq<int>, ys: seq<int>, ws: seq<int>, k: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        ensures JoinedWith2(xs, ys+ws, k) == JoinedWith2(xs, ys, k) + JoinedWith2(xs+ys, ws, k)
+    {
+        JoinedWithSame(xs, ys+ws, k);
+        JoinedWithSame(xs, ys, k);
+        JoinedWithSame(xs+ys, ws, k);
+        JoinedWithConcatSeq(xs, ys, ws, k);
+    }
+
+    lemma  pairSetRmapAdd(ss: set<(int, int)>, yy: set<(int,int)>, i: int )
+        requires ss !! yy
+        ensures pairSetRmap(ss+yy, i) == pairSetRmap(ss, i) + pairSetRmap(yy, i)
+    {
+        forall pair | pair in pairSetRmap(ss+yy, i)
+            ensures pair in pairSetRmap(ss, i) + pairSetRmap(yy, i)
+        {
+           pairSetRmapInverse(ss+yy, i, pair); 
+        }
+
+        forall pair | pair in pairSetRmap(ss, i) + pairSetRmap(yy, i)
+            ensures pair in pairSetRmap(ss+yy, i)
+        {
+            if pair in pairSetRmap(ss, i) {
+                pairSetRmapInverse(ss, i, pair); 
+            }else { 
+                pairSetRmapInverse(yy, i, pair); 
+            }
+
+        }
+    }
+    lemma pairSetRmapNest(ss: set<(int, int)>, i: int, k: int )
+        ensures pairSetRmap(pairSetRmap(ss,i),k) == pairSetRmap(ss,i+k)
+    {
+        forall pair | pair in pairSetRmap(pairSetRmap(ss,i),k) 
+            ensures pair in pairSetRmap(ss, i+k)
+        {
+            pairSetRmapInverse(pairSetRmap(ss,i),k, pair);
+            var ipair := rmap(pair, -k);
+            assert ipair in pairSetRmap(ss,i);
+            pairSetRmapInverse(ss, i, ipair);
+            var ikpair := rmap(pair, -(i+k));
+            assert ikpair in ss;
+            assert rmap(ikpair, i+k) == pair;
+        }
+
+        forall pair | pair in pairSetRmap(ss, i+k) 
+            ensures pair in pairSetRmap(pairSetRmap(ss,i),k)
+        {
+            pairSetRmapInverse(ss, i+k, pair);
+            var qpair := rmap(pair, -(i+k));
+            assert qpair in ss;
+            var ipair := rmap(qpair, i);
+            assert ipair in pairSetRmap(ss,i);
+            var ikpair := rmap(ipair, k);
+            assert ikpair in pairSetRmap(pairSetRmap(ss,i),k);
+            assert ikpair == pair;
+        }
+    }
+
+    lemma {:vcs_split_on_every_assert} joinedWithRest(xs: seq<int>, ys: seq<int>, k: int, i: int)
+        requires xs != []
+        requires ys != []
+        requires 0 <= k < |xs|
+        requires 0 <= i < |ys|
+        ensures |pairSetRmap(JoinedWith(xs, ys[i+1..], k),  1+|ys[..i]|)| == |JoinedWith(xs+ys[..i], ys[i+1..], k)|
+    {
+        assert ys == ys[..i]+[ys[i]]+ys[i+1..];
+        forall pair | pair in pairSetRmap(JoinedWith(xs, ys[i+1..], k),  |ys[..i]|)
+            ensures pair in JoinedWith(xs+ys[..i], ys[i+1..], k) 
+        {
+            assert |ys[..i]|+|ys[i+1..]| == |ys|-1;
+            assert |ys[..i]|+1 == i+1;
+            var rest := xs + ys[..i]+ys[i+1..];
+            pairSetRmapInverse(JoinedWith(xs, ys[i+1..], k), |ys[..i]|, pair);
+            var qpair := rmap(pair, -(i));
+            assert qpair in JoinedWith(xs, ys[i+1..], k);
+            assert |xs| <= qpair.1 < |xs|+|ys[i+1..]|;
+            assert |xs|+i <= pair.1 < |xs|+i+|ys[i+1..]|;
+            assert rest[pair.0] == (xs+ys[i+1..])[pair.0];
+            assert rest[pair.1] == (xs+ys[i+1..])[qpair.1];
+            assert IsInverted(rest, k, pair.1);
+            assert (pair.0, pair.1) in JoinedWith(xs+ys[..i], ys[i+1..], k);
+            // assert 
+        }
+
+        forall pair | pair in JoinedWith(xs+ys[..i], ys[i+1..], k)
+            ensures pair in pairSetRmap(JoinedWith(xs, ys[i+1..], k),  |ys[..i]|) 
+        {
+            var rest := xs+ys[..i]+ys[i+1..];
+            assert |ys[..i]| == i;
+            assert |xs|+i <= pair.1 < |xs|+ i+|ys[i+1..]|;
+            var qpair := rmap(pair, -|ys[..i]|);
+            assert rest[pair.0] == (xs+ys[i+1..])[qpair.0];
+            assert rest[pair.1] == (xs+ys[i+1..])[qpair.1];
+            assert qpair in JoinedWith(xs, ys[i+1..], k);
+            assert IsInverted(xs+ys[i+1..], k, qpair.1);
+            assert rmap(qpair, i) == pair;
+
+        }
+        pairSetRmapLemma(JoinedWith(xs, ys[i+1..], k), |ys[..i]|);
+        pairSetRmapLemma(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|);
+        assert pairSetRmap(JoinedWith(xs, ys[i+1..], k),  |ys[..i]|) == JoinedWith(xs+ys[..i], ys[i+1..], k);
+    }
+
+    lemma {:vcs_split_on_every_assert} JoinedWithMS(xs: seq<int>, ys: seq<int>, k: int, i: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        requires 0 <= i < |ys|
+        ensures IsInverted(xs+ys, k, |xs|+i) ==> |JoinedWith(xs, ys, k)| == |JoinedWith(xs, ys[0..i] + ys[i+1..], k)| + 1
+        ensures !IsInverted(xs+ys, k, |xs|+i) ==> |JoinedWith(xs, ys, k)| == |JoinedWith(xs, ys[0..i] + ys[i+1..], k)|
+    {
+        if ys == [] {
+        assert IsInverted(xs+ys, k, |xs|+i) ==> |JoinedWith(xs, ys, k)| == |JoinedWith(xs, ys[0..i] + ys[i+1..], k)| + 1;
+        assert !IsInverted(xs+ys, k, |xs|+i) ==> |JoinedWith(xs, ys, k)| == |JoinedWith(xs, ys[0..i] + ys[i+1..], k)|;
+        }else{
+            assert ys == ys[0..i]+[ys[i]]+ys[i+1..];
+            assert ys[i..] == [ys[i]]+ys[i+1..];
+            JoinedWithConcatSeq(xs, ys[..i], ys[i+1..], k);
+            if IsInverted(xs+ys, k, |xs|+i) {
+                assert (xs+ys)[|xs|+i] == ys[i];
+                assert (xs+[ys[i]])[|xs|+0] == ys[i];
+                JoinedWithSplit(xs, ys, i, k);
+                assert |ys[i..]| > 0;
+                JoinedWithSplit(xs, ys[i..], 1, k);
+                assert JoinedWith(xs, [ys[i]], k) == {(k, |xs|)};
+                assert pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) == {(k, |xs|+i)};
+                assert |pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)| ==1;
+                assert JoinedWith(xs, [ys[i]], k) !! pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1) by {
+                    forall x | x in pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1) 
+                        ensures x !in JoinedWith(xs, [ys[i]], k)
+                    {
+                        pairSetRmapInverse(JoinedWith(xs, ys[i+1..], k), 1, x);
+                        var pair := rmap(x, -1);
+                        assert pair in JoinedWith(xs, ys[i+1..], k);
+                        assert |xs| <= pair.1 < |xs|+|ys[i+1..]|;
+                        assert x.1 >= |xs|+1;
+                        // assert xs+ys[i+1..] < 
+                    }
+                }
+                assume {:axiom} JoinedWith(xs, [ys[i]], k) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                assume {:axiom} JoinedWith(xs, [ys[i]], k) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)+ pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                assume {:axiom} pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                assume {:axiom} pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                calc {
+                    JoinedWith(xs, ys, k);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1), |ys[..i]|);
+                    {pairSetRmapAdd(JoinedWith(xs, [ys[i]], k), pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1) , |ys[..i]|);}
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) + pairSetRmap(pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1), |ys[..i]|);
+                    {pairSetRmapNest(JoinedWith(xs, ys[i+1..], k),1,|ys[..i]|);}
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                    // {joinedWithRest(xs, ys, k, i);}
+                    // JoinedWith(xs, ys[..i] + ys[i+1..], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                }
+                calc {
+                    |JoinedWith(xs, ys, k)|;
+                    {assert JoinedWith(xs, ys, k)  == JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);}
+                    |JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)|;
+                    |JoinedWith(xs, ys[..i], k)| + |pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)|;
+                    |JoinedWith(xs, ys[..i], k)| + |pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|)| + |pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)|;
+                    |JoinedWith(xs, ys[..i], k)| + |pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|)| + 1;
+                    {joinedWithRest(xs, ys, k, i);}
+                    |JoinedWith(xs, ys[..i], k)|+|JoinedWith(xs+ys[..i], ys[i+1..], k)|+1;
+                }
+                // assert JoinedWith(xs, ys, k) == JoinedWith(xs, ys[0..i] + ys[i+1..], k) + {(k, |xs|+i)};
+                assert |JoinedWith(xs, ys, k)| == |JoinedWith(xs, ys[0..i] + ys[i+1..], k)| + 1;
+            }else{
+                assert JoinedWith(xs, [ys[i]], k) == {};
+                assert pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) == {};
+                assert |pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)| ==0;
+                JoinedWithSplit(xs, ys, i, k);
+                assert |ys[i..]| > 0;
+                JoinedWithSplit(xs, ys[i..], 1, k);
+                assert pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) == pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|);
+
+                calc {
+                    JoinedWith(xs, ys, k);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1), |ys[..i]|);
+                    {pairSetRmapAdd(JoinedWith(xs, [ys[i]], k), pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1) , |ys[..i]|);}
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) + pairSetRmap(pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1), |ys[..i]|);
+                    {pairSetRmapNest(JoinedWith(xs, ys[i+1..], k),1,|ys[..i]|);}
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                    JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|);
+                    // {joinedWithRest(xs, ys, k, i);}
+                    // JoinedWith(xs, ys[..i] + ys[i+1..], k) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                }
+
+                assume JoinedWith(xs, [ys[i]], k) !! pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);
+                assume JoinedWith(xs, ys[..i], k) !! pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1+|ys[..i]|);
+                calc {
+                    |JoinedWith(xs, ys, k)|;
+                    {assert JoinedWith(xs, ys, k)  == JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|);}
+                    |JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|) + pairSetRmap(JoinedWith(xs, [ys[i]], k), |ys[..i]|)|;
+                    |JoinedWith(xs, ys[..i], k) + pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|)|;
+                    |JoinedWith(xs, ys[..i], k)| + |pairSetRmap(JoinedWith(xs, ys[i+1..], k), 1 + |ys[..i]|)| ;
+                    {joinedWithRest(xs, ys, k, i);}
+                    |JoinedWith(xs, ys[..i], k)|+|JoinedWith(xs+ys[..i], ys[i+1..], k)|;
+                }
+                // assert |JoinedWith(xs, ys, k)| == |JoinedWith(xs, ys[0..i] + ys[i+1..], k)|;
+            }
+        }
+    }
+
+    lemma JoinedWith2MS(xs: seq<int>, ys: seq<int>, k: int, i: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        requires 0 <= i < |ys|
+        ensures IsInverted(xs+ys, k, |xs|+i) ==> |JoinedWith2(xs, ys, k)| == |JoinedWith2(xs, ys[0..i] + ys[i+1..], k)| + 1
+        ensures !IsInverted(xs+ys, k, |xs|+i) ==> |JoinedWith2(xs, ys, k)| == |JoinedWith2(xs, ys[0..i] + ys[i+1..], k)|
+    {
+        JoinedWithSame(xs, ys, k);
+        JoinedWithSame(xs, ys[0..i] + ys[i+1..], k);
+        JoinedWithMS(xs, ys, k, i);
+
+    }
+   
+
+    lemma JoinedWith2CardinalityEqualForOrderedAndUnordedSeqs(xs: seq<int>, ys: seq<int>, sxs: seq<int>, sys: seq<int>, k: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        requires multiset(xs) == multiset(sxs)
+        requires multiset(ys) == multiset(sys)
+        requires Sorted(sxs)
+        requires Sorted(sys)
+        requires sxs[0] == xs[k]
+        // decreases ys
+        ensures |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|
+    {
+        if ys == [] {
+            assert multiset(ys) == multiset([]);
+            assert JoinedWith2(sxs, sys, 0) == {};
+            assert JoinedWith2(xs, ys, k) == {};
+            assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
+        }else{
+            if IsInverted(xs+ys, k, |xs|) {
+                assert ys == [ys[0]] + ys[1..];
+                assert multiset(ys) == multiset([ys[0]]) + multiset(ys[1..]);
+                assert ys[0] == (xs+ys)[|xs|];
+                assert ys[0] in multiset(ys);
+                assert ys[0] in sys;
+                var j :| 0 <= j < |sys| && ys[0] == sys[j];
+                assert sys == sys[0..j] + [ys[0]] + sys[j+1..];
+                assert multiset(sys) == multiset(sys[0..j]) + multiset([ys[0]]) + multiset(sys[j+1..]);
+                calc {
+                    multiset(ys[1..]);
+                    multiset(ys)-multiset{ys[0]};
+                    multiset(sys)-multiset{ys[0]};
+                }
+                assert multiset(ys[1..]) == multiset(sys[0..j] + sys[j+1..]);
+                assert (sxs+sys)[0] == xs[k];
+                assert (sxs+sys)[|sxs|+j] == ys[0];
+                assert IsInverted(sxs+sys, 0, |sxs|+j);
+                JoinedWith2CardinalityEqualForOrderedAndUnordedSeqs(xs, ys[1..], sxs, sys[0..j] + sys[j+1..], k);
+                assert (k, |xs|) in JoinedWith2(xs, ys, k);
+                JoinedWithSame(sxs, sys, 0);
+                assert (0, |sxs|+j) in JoinedWith(sxs, sys, 0);
+                assert (0, |sxs|+j) in JoinedWith2(sxs, sys, 0);
+                JoinedWith2MS(sxs, sys, 0, j);
+                assert |JoinedWith2(sxs, sys, 0)| == 1 + |JoinedWith2(sxs, sys[0..j] + sys[j+1..], 0)|;
+
+                pairSetRmapLemma(JoinedWith2(xs, ys[1..], k), 1);
+                JoinedWith2Size(xs, ys, k);
+                assert |JoinedWith2(xs, ys[1..], k)| == |pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
+                assert JoinedWith2(xs, ys, k) == {(k, |xs|)}+pairSetRmap(JoinedWith2(xs, ys[1..], k), 1);
+                assert |JoinedWith2(xs, ys, k)| == 1+|pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
+                assert |JoinedWith2(xs, ys, k)| == 1 + |JoinedWith2(xs, ys[1..], k)|;
+            assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
+            }else{
+
+                assert ys == [ys[0]] + ys[1..];
+                assert multiset(ys) == multiset([ys[0]]) + multiset(ys[1..]);
+                assert ys[0] in multiset(ys);
+                assert ys[0] in sys;
+                var j :| 0 <= j < |sys| && ys[0] == sys[j];
+                assert sys == sys[0..j] + [ys[0]] + sys[j+1..];
+                assert multiset(sys) == multiset(sys[0..j]) + multiset([ys[0]]) + multiset(sys[j+1..]);
+                calc {
+                    multiset(ys[1..]);
+                    multiset(ys)-multiset{ys[0]};
+                    multiset(sys)-multiset{ys[0]};
+                }
+                assert multiset(ys[1..]) == multiset(sys[0..j] + sys[j+1..]);
+                JoinedWith2CardinalityEqualForOrderedAndUnordedSeqs(xs, ys[1..], sxs, sys[0..j] + sys[j+1..], k);
+                JoinedWith2MS(sxs, sys, 0, j);
+                pairSetRmapLemma(JoinedWith2(xs, ys[1..], k), 1);
+                JoinedWith2Size(xs, ys, k);
+                assert |JoinedWith2(xs, ys, k)| == |JoinedWith2(xs, ys[1..], k)|;
+            assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
+
+            }
+        }
+    }
+
+    lemma {:verify } something(xs: seq<int>, ys: seq<int>, sxs: seq<int>, sys: seq<int>, k: int)
+        requires xs != []
+        requires 0 <= k < |xs|
+        requires multiset(xs) == multiset(sxs)
+        requires multiset(ys) == multiset(sys)
+        requires Sorted(sxs)
+        requires Sorted(sys)
+        requires sxs[0] == xs[k]
+        ensures |JoinedWith(sxs, sys, 0)| == |JoinedWith(xs, ys, k)|
+    {
+        JoinedWith2CardinalityEqualForOrderedAndUnordedSeqs(xs, ys, sxs, sys, k);
+        JoinedWithSame(sxs, sys, 0);
+        JoinedWithSame(xs, ys, k);
+
+    }
+
+    function restPairs(left: seq<int>, i: int, j: int): set<(int, int)>
+        requires 0 <= i <= |left|
+    {
+        set x | i <= x < |left| :: (x, |left|+j)
+    }
+    lemma restPairsLemma(left: seq<int>, i: int, j: int)
+        requires 0 <= i <= |left|
+        ensures |restPairs(left, i, j)| == |left|-i
+        decreases |left|-i
+    {
+        if i == |left| {
+            assert restPairs(left, i, j) == {};
+            assert |restPairs(left, i, j)| == 0;
+        }else{
+            assert (i, |left|+j) in restPairs(left, i, j);
+            restPairsLemma(left, i+1, j);
+            assert restPairs(left, i, j) == {(i, |left|+j)} + restPairs(left, i+1, j);
+        }
+    }
+    
+    lemma   InversionSetJoinMaintained(left: seq<int>, right: seq<int>, i: int, j: int, count: int, merged: seq<int>)
+        requires Sorted(left)
+        requires Sorted(right)
+        requires 0 <= i <= |left|
+        requires 0 <= j <= |right|
+        requires multiset(merged) == multiset(left[0..i] + right[0..j])
+        requires forall x, y :: x in merged && y in left[i..]+right[j..] ==> x <= y
+        requires count == |inversersionSetJoined(left, right[0..j])|
+        ensures i+j < |left|+|right| && (j == |right| || (i < |left| && left[i] <= right[j])) ==> count == |inversersionSetJoined(left, right[0..j])|
+        ensures i+j < |left|+|right| && !(j == |right| || (i < |left| && left[i] <= right[j])) ==> count + |left| - i == |inversersionSetJoined(left, right[0..j+1])|
+    {
+        if i+j < |left|+|right| && (j >= |right| || (i < |left| && left[i] < right[j])) {
+            assert i+j < |left|+|right| && (j == |right| || (i < |left| && left[i] < right[j])) ==> count == |inversersionSetJoined(left, right[0..j])|;
+        }else if i+j < |left|+|right| && !(j >= |right| || (i < |left| && left[i] < right[j])) {
+            assert j < |right|;
+            assert !(i < |left| && left[i] < right[j]);
+            assert i == |left| || left[i] >= right[j];
+            assert forall x :: x in inversersionSetJoined(left, right[0..j]) ==> x in inversersionSetJoined(left, right[0..j+1]);
+            if i == |left| {
+                assert |left| - i == 0;
+                assert right[j] in left[i..]+right[j..];
+                assert forall k :: 0 <= k < |left| ==> !IsInverted(left+right[0..j+1], k, |left|+j) by {
+                    forall k | 0 <=k < |left|
+                        ensures !IsInverted(left+right[0..j+1], k, |left|+j)
+                    {
+                        assert left[0..i] == left;
+                        var slice := left+right[0..j+1];
+                        assert slice[k] in multiset(left[0..i] + right[0..j]);
+                        assert slice[k] in merged;
+                    }
+                }
+                assert forall x :: x in inversersionSetJoined(left, right[0..j+1]) ==> x in inversersionSetJoined(left, right[0..j]) by {
+                    forall x |  x in inversersionSetJoined(left, right[0..j+1])
+                        ensures x in inversersionSetJoined(left, right[0..j])
+                    {
+                        if x.1 == |left|+j {
+                            assert 0 <= x.0 < |left|;
+                            assert IsInverted(left+right[0..j+1], x.0, |left|+j);
+                            assert false;
+                        }else{
+
+                        }
+                    }
+                }
+                assert inversersionSetJoined(left, right[0..j]) == inversersionSetJoined(left, right[0..j+1]);
+                assert count + |left| - i == |inversersionSetJoined(left, right[0..j+1])|;
+            }else if left[i] > right[j] {
+                assert forall x :: x in inversersionSetJoined(left, right[0..j]) ==> x in inversersionSetJoined(left, right[0..j+1]);
+                //assert |inversersionSetJoined(left, right[0..j+1])| >= |inversersionSetJoined(left, right[0..j])|;
+                var newpairs := restPairs(left, i, j);
+                restPairsLemma(left, i, j);
+                assert |newpairs| == |left| - i;
+                assert newpairs !! inversersionSetJoined(left, right[0..j]);
+                assert |newpairs + inversersionSetJoined(left, right[0..j])| == count + |left|-i;
+                assert forall x :: x in newpairs + inversersionSetJoined(left, right[0..j]) ==> x in inversersionSetJoined(left, right[0..j+1]) by {
+                    forall x | x in newpairs + inversersionSetJoined(left, right[0..j])
+                        ensures x in inversersionSetJoined(left, right[0..j+1])
+                    {
+                        if x in newpairs  {
+                            assert i <= x.0 < |left|;
+                            assert x.1 == |left|+j;
+                            assert left[x.0] == (left+right[0..j+1])[x.0];
+                            assert left[i] <= left[x.0];
+                            assert left[x.0] > right[j];
+                            assert IsInverted(left+right[0..j+1], x.0, x.1);
+                            assert x in inversersionSetJoined(left, right[0..j+1]);
+                        }else{
+                            assert x in inversersionSetJoined(left, right[0..j+1]);
+                        }
+
+                    }
+                }
+                assert forall x :: x in inversersionSetJoined(left, right[0..j+1]) ==> x in newpairs +inversersionSetJoined(left, right[0..j]) by {
+                    forall x | x in inversersionSetJoined(left, right[0..j+1])
+                        ensures x in newpairs + inversersionSetJoined(left, right[0..j])
+                    {
+                        if x.1 == |left|+j {
+                            assert x.0 >= i by {
+                                if x.0 < i {
+                                    assert right[j] in left[i..]+right[j..];
+                                    assert left[x.0] in left[0..i] + right[0..j];
+                                    assert left[x.0] in multiset(merged);
+                                    assert left[x.0] in merged;
+                                    assert left[x.0] <= right[j];
+                                }
+                            }
+                            assert x in newpairs;
+                        }else {
+                            assert x in inversersionSetJoined(left, right[0..j]);
+                        }
+                    }
+                }
+                assert newpairs +inversersionSetJoined(left, right[0..j]) == inversersionSetJoined(left, right[0..j+1]);
+                assert count + |left| - i == |inversersionSetJoined(left, right[0..j+1])|;
             }
         }
     }
