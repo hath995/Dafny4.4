@@ -117,13 +117,12 @@ module InvertTreeIterative {
             invariant visited + unvisited == root.repr
             invariant forall x :: x in stack ==> x in root.repr
             invariant forall x :: x in stack ==> x.Valid()
-            invariant forall x :: x in stack ==> x in unvisited
             invariant AllDisjoint(stack)
             invariant unvisited == TreeUnion(stack)
-            // invariant forall x :: x in stack ==> 
+            invariant forall x :: x in stack ==> x in unvisited
             invariant i == |visited|
             invariant 0 <= i <= |nodes|
-            // invariant i < |nodes| ==> stack[0] == nodes[i]
+            invariant i < |nodes| ==> stack[|stack|-1] == nodes[i]
             invariant forall x :: x in unvisited ==> unchanged(x)
             invariant forall node :: node in visited ==> allocated(node)
             // invariant forall node :: node in visited ==> node.right == old(node.left) && node.left == old(node.right) && node.Valid()
@@ -137,6 +136,7 @@ module InvertTreeIterative {
             assert current.Valid();
             ghost var oldstack := stack;
             stack := stack[..|stack|-1];
+            assert stack == oldstack[..|oldstack|-1];
             assert forall x :: x in stack ==> x.Valid();
             ChildNodesAreValid(root, current);
             if current.right != null {
