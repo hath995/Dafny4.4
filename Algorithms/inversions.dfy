@@ -120,13 +120,13 @@ module Inversions {
             print "before: i: ",i," j: ",j, " inv: ", inv," ", inversersionSetJoined(left, right[..j]), " |_|=", |inversersionSetJoined(left, right[..j])|, "\n";
             InversionSetJoinMaintained(left, right, i, j, inv, merged);
             if j >= |right| || (i < |left| && left[i] <= right[j]) {
-                assert i < |left| by {
-                    if i < |left| {
-                        assert i < |left|;
-                    }else{
-                        assert j >= |right|;
-                    }
-                }
+                // assert i < |left| by {
+                //     if i < |left| {
+                //         assert i < |left|;
+                //     }else{
+                //         assert j >= |right|;
+                //     }
+                // }
 
                 // assert Sorted(merged); 
                 assert forall x, y :: x in merged && y in left[i..]+right[j..] ==> x <= y;
@@ -143,37 +143,37 @@ module Inversions {
                 merged := merged + [left[i]];
                 assert left[0..i+1] == left[0..i] + [left[i]];
                 assert multiset(merged) == multiset(left[0..i+1] + right[0..j]);
-                assert forall x, y :: x in merged && y in left[i+1..]+right[j..] ==> x <= y by {
-                    forall x, y | x in merged && y in left[i+1..]+right[j..] 
-                        ensures x <= y
-                    {
-                        if x in left[0..i+1] {
-                            assert x <= left[i];
-                            assert x <= y;
-                        }else{
-                            assert x in merged;
-                            assert x in right[0..j];
-                            var k :| 0 <= k < j <= |right| && x == right[k];
-                            assert k < j;
-                            if y in left[i+1..] {
-                                assert y >= left[i]; 
-                                if x == left[i] {
-                                    assert x <= left[i];
-                                }else if x in oldmerged {
-                                    assert forall z, w :: z in oldmerged && w in left[i..]+right[j..] ==> z <= w; 
-                                    assert left[i] in left[i..]+right[j..];
-                                    assert x <= left[i];
+                // assert forall x, y :: x in merged && y in left[i+1..]+right[j..] ==> x <= y by {
+                //     forall x, y | x in merged && y in left[i+1..]+right[j..] 
+                //         ensures x <= y
+                //     {
+                //         if x in left[0..i+1] {
+                //             assert x <= left[i];
+                //             assert x <= y;
+                //         }else{
+                //             assert x in merged;
+                //             assert x in right[0..j];
+                //             var k :| 0 <= k < j <= |right| && x == right[k];
+                //             assert k < j;
+                //             if y in left[i+1..] {
+                //                 assert y >= left[i]; 
+                //                 if x == left[i] {
+                //                     assert x <= left[i];
+                //                 }else if x in oldmerged {
+                //                     assert forall z, w :: z in oldmerged && w in left[i..]+right[j..] ==> z <= w; 
+                //                     assert left[i] in left[i..]+right[j..];
+                //                     assert x <= left[i];
 
-                                }
-                                assert x <= y;
-                            }else{
-                                assert y in right[j..];
-                                assert x <= y;
+                //                 }
+                //                 assert x <= y;
+                //             }else{
+                //                 assert y in right[j..];
+                //                 assert x <= y;
 
-                            }
-                        }
-                    }
-                }
+                //             }
+                //         }
+                //     }
+                // }
                 i := i + 1;
                 assert inv == |inversersionSetJoined(left, right[0..j])|;
             }else{
@@ -190,7 +190,7 @@ module Inversions {
                 merged := merged + [right[j]];
                 assert forall x, y :: x in merged && y in left[i..]+right[j+1..] ==> x <= y;
                 j := j + 1;
-                assert Sorted(merged);
+                // assert Sorted(merged);
                 inv := inv + |left| - i;
                 assert inv == |inversersionSetJoined(left, right[0..j])|;
             }

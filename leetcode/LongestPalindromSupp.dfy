@@ -372,13 +372,14 @@ module Palindrome {
         requires s != {}
         ensures exists x :: x in s && forall y :: y in s ==> x >= y
     {
-    var x :| x in s;
-    if s == {x} {
-    } else {
-        var s' := s - {x};
-        assert s == s' + {x};
-        ThereIsAMaximum(s');
-    }
+        assert s != {};
+        var x :| x in s;
+        if s == {x} {
+        } else {
+            var s' := s - {x};
+            assert s == s' + {x};
+            ThereIsAMaximum(s');
+        }
     }
 
     predicate charCountOdd(x: char, ms: multiset<char>) {

@@ -50,24 +50,24 @@ module InversionDefs {
         ensures ys != [] && !IsInverted(xs+ys, k, |xs|) ==> |JoinedWith2(xs, ys, k)| == |pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|
     {
         if ys == [] {
-            assert JoinedWith2(xs, ys, k) == {};
-            assert |JoinedWith2(xs, ys, k)| == 0;
+            // assert JoinedWith2(xs, ys, k) == {};
+            // assert |JoinedWith2(xs, ys, k)| == 0;
         }else{
             if IsInverted(xs + ys, k, |xs|) {
                 JoinedWithSame(xs, ys[1..], k);
-                assert forall x :: x in JoinedWith2(xs, ys[1..], k) ==> rmap(x, 1).1 > |xs|;
+                // assert forall x :: x in JoinedWith2(xs, ys[1..], k) ==> rmap(x, 1).1 > |xs|;
                 assert (k, |xs|) !in pairSetRmap(JoinedWith2(xs, ys[1..], k), 1) by {
                     if (k, |xs|) in pairSetRmap(JoinedWith2(xs, ys[1..], k), 1) {
                         pairSetRmapInverse(JoinedWith2(xs, ys[1..], k), 1, (k, |xs|));
-                        assert rmap((k, |xs|), -1) == (k, |xs|);
+                        // assert rmap((k, |xs|), -1) == (k, |xs|);
                         assert false;
                     }
                 }
-                assert JoinedWith2(xs, ys, k) == {(k, |xs|)}+pairSetRmap(JoinedWith2(xs, ys[1..], k), 1);
-                assert |JoinedWith2(xs, ys, k)| == 1+|pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
+                // assert JoinedWith2(xs, ys, k) == {(k, |xs|)}+pairSetRmap(JoinedWith2(xs, ys[1..], k), 1);
+                // assert |JoinedWith2(xs, ys, k)| == 1+|pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
             }else{
-                assert JoinedWith2(xs, ys, k) == pairSetRmap(JoinedWith2(xs, ys[1..], k),1);
-                assert |JoinedWith2(xs, ys, k)| == |pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
+                // assert JoinedWith2(xs, ys, k) == pairSetRmap(JoinedWith2(xs, ys[1..], k),1);
+                // assert |JoinedWith2(xs, ys, k)| == |pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
             }
         }
     }
@@ -233,7 +233,7 @@ module InversionDefs {
     {
         if ss == {} {
             assert |ss| == 0;
-            assert |pairSetMap2(ss, i)| == 0;
+            // assert |pairSetMap2(ss, i)| == 0;
         }else{
             var result := pairSetMap2(ss, i);
             var pair :| pair in ss && {pmap(pair, i)} + pairSetMap2(ss-{pair}, i) == result;
@@ -244,15 +244,15 @@ module InversionDefs {
 
             assert mpair !in pairSetMap2(ss-{pair}, i) by {
                 if mpair in pairSetMap2(ss-{pair}, i) {
-                    assert mpair in pairSetMap2(ss-{pair}, i);
+                    // assert mpair in pairSetMap2(ss-{pair}, i);
                     pairSetMap2Inverse(ss-{pair}, i, mpair);
-                    assert pmap(mpair, -i) in ss-{pair};
-                    assert pmap(mpair, -i) == pair;
+                    // assert pmap(mpair, -i) in ss-{pair};
+                    // assert pmap(mpair, -i) == pair;
                     assert false;
                 }
             }
-            assert result == {mpair} + pairSetMap2(ss-{pair}, i);
-            assert |result| == 1 + |pairSetMap2(ss-{pair}, i)|;
+            // assert result == {mpair} + pairSetMap2(ss-{pair}, i);
+            // assert |result| == 1 + |pairSetMap2(ss-{pair}, i)|;
         }
 
     }
@@ -267,7 +267,7 @@ module InversionDefs {
     {
         pairSetMap2Lemma(ss, i);
         pairsEqual(ss, i);
-        assert |pairSetMap(ss, i)| == |pairSetMap2(ss, i)|;
+        // assert |pairSetMap(ss, i)| == |pairSetMap2(ss, i)|;
         assert |pairSetMap(ss, i)| == |ss|;
     }
     lemma pairSetMapInverse(ss: set<(int, int)>, i: int, pair: (int, int))
@@ -287,7 +287,7 @@ module InversionDefs {
     {
         if ss == {} {
             assert |ss| == 0;
-            assert |pairSetRmap(ss, i)| == 0;
+            // assert |pairSetRmap(ss, i)| == 0;
         }else{
             var result := pairSetRmap(ss, i);
             var pair :| pair in ss && {rmap(pair, i)} + pairSetRmap(ss-{pair}, i) == result;
@@ -298,15 +298,15 @@ module InversionDefs {
 
             assert mpair !in pairSetRmap(ss-{pair}, i) by {
                 if mpair in pairSetRmap(ss-{pair}, i) {
-                    assert mpair in pairSetRmap(ss-{pair}, i);
+                    // assert mpair in pairSetRmap(ss-{pair}, i);
                     pairSetRmapInverse(ss-{pair}, i, mpair);
-                    assert rmap(mpair, -i) in ss-{pair};
-                    assert rmap(mpair, -i) == pair;
+                    // assert rmap(mpair, -i) in ss-{pair};
+                    // assert rmap(mpair, -i) == pair;
                     assert false;
                 }
             }
-            assert result == {mpair} + pairSetRmap(ss-{pair}, i);
-            assert |result| == 1 + |pairSetRmap(ss-{pair}, i)|;
+            // assert result == {mpair} + pairSetRmap(ss-{pair}, i);
+            // assert |result| == 1 + |pairSetRmap(ss-{pair}, i)|;
         }
 
     }
@@ -324,7 +324,7 @@ module InversionDefs {
             }else{
                 assert pair !in JoinedWith(xs, ys, 0);
                 assert pmap(pair, -1) in inversersionSetJoined(xs[1..], ys);
-                assert pair in pairSetMap2(inversersionSetJoined(xs[1..], ys),1);
+                // assert pair in pairSetMap2(inversersionSetJoined(xs[1..], ys),1);
             }
         }
 
@@ -337,14 +337,14 @@ module InversionDefs {
                 var total := xs + ys;
                 var tail := xs[1..] + ys;
                 assert xs+ys == [xs[0]] + xs[1..] + ys;
-                assert pair in pairSetMap2(inversersionSetJoined(xs[1..], ys),1);
+                // assert pair in pairSetMap2(inversersionSetJoined(xs[1..], ys),1);
                 // assert pmap(pair, -1) in inversersionSetJoined(xs[1..], ys);
                 var p := pmap(pair, -1);
                 pairSetMap2Inverse(inversersionSetJoined(xs[1..], ys), 1, pair);
                 assert p in inversersionSetJoined(xs[1..], ys);
                 assert total[pair.0] == tail[p.0];
                 assert total[pair.1] == tail[p.1];
-                assert IsInverted(tail, p.0, p.1);
+                // assert IsInverted(tail, p.0, p.1);
                 assert IsInverted(total, pair.0, pair.1);
             }
         }
@@ -450,14 +450,14 @@ module InversionDefs {
                 assert pair in inversionSet(xs) + pairSetMap(inversionSet(ys), |xs|) + inversersionSetJoined(xs, ys);
             }else{
                 if 0 <= pair.0 < |xs| && |xs| <= pair.1 < n {
-                    assert pair in inversersionSetJoined(xs, ys);
+                    // assert pair in inversersionSetJoined(xs, ys);
                 }else if 0 <= pair.0 < |xs| && 0 <= pair.1 < |xs| {
-                    assert pair in inversionSet(xs);
+                    // assert pair in inversionSet(xs);
                 }else if |xs| <= pair.0 < n && |xs| <= pair.1 < n {
                     var yinversions := inversionSet(ys);
                     var ypair := (pair.0 - |xs|, pair.1 - |xs|);
-                    assert ypair in yinversions;
-                    assert pair in pairSetMap(inversionSet(ys), |xs|);
+                    // assert ypair in yinversions;
+                    // assert pair in pairSetMap(inversionSet(ys), |xs|);
                 }
                 assert false;
             }
@@ -546,26 +546,27 @@ module InversionDefs {
     {
         if ys == [] {
             assert JoinedWith(xs, ys, k) == {};
-            assert JoinedWith2(xs, ys, k) == {};
+            // assert JoinedWith2(xs, ys, k) == {};
         }else{
             if IsInverted(xs + ys, k, |xs|) {
                 assert ys == [ys[0]] + ys[1..];
                 assert (xs + ys)[|xs|] == ys[0];
                 assert JoinedWith2(xs, ys, k) == {(k, |xs|)}+pairSetRmap(JoinedWith2(xs, ys[1..], k), 1);
                 JoinedWithSame(xs, ys[1..], k);
-                assert (k, |xs|) in JoinedWith2(xs, ys, k);
+                // assert (k, |xs|) in JoinedWith2(xs, ys, k);
                 assert (k, |xs|) in JoinedWith(xs, ys, k);
                 JoinedWithConcat(xs, ys, k);
-                assert JoinedWith(xs, ys, k) == JoinedWith2(xs, ys, k);
+                // assert JoinedWith(xs, ys, k) == JoinedWith2(xs, ys, k);
             }else{
                 JoinedWithConcat(xs, ys, k);
-                assert JoinedWith2(xs, ys, k) == pairSetRmap(JoinedWith2(xs, ys[1..], k),1);
+                // assert JoinedWith2(xs, ys, k) == pairSetRmap(JoinedWith2(xs, ys[1..], k),1);
             }
 
         }
     }
 
     lemma  JoinedWithSplit(xs: seq<int>, ys: seq<int>, i: int, k: int)
+        requires xs != []
         requires xs != []
         requires 0 <= k < |xs|
         requires 0 <= i <= |ys|
@@ -583,7 +584,7 @@ module InversionDefs {
             }else{
                 var yi := pair.1-|ys[..i]|;  
                 assert rmap((pair.0, yi), |ys[..i]|) == pair;
-                assert pair in pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
+                // assert pair in pairSetRmap(JoinedWith(xs, ys[i..], k), |ys[..i]|);
             }
         }
 
@@ -614,7 +615,7 @@ module InversionDefs {
                         pairSetRmapInverse(JoinedWith(xs, ys[i..], k), i, y);
                         var jj := rmap(y, -i);
                         assert |xs| <= jj.1 < |xs|+|ys[i..]|;
-                        assert y == rmap(jj, i);
+                        // assert y == rmap(jj, i);
                         assert |xs|+i <= y.1 < |xs|+|ys|;
 
                     }
@@ -893,9 +894,9 @@ module InversionDefs {
     {
         if ys == [] {
             assert multiset(ys) == multiset([]);
-            assert JoinedWith2(sxs, sys, 0) == {};
-            assert JoinedWith2(xs, ys, k) == {};
-            assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
+            // assert JoinedWith2(sxs, sys, 0) == {};
+            // assert JoinedWith2(xs, ys, k) == {};
+            // assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
         }else{
             if IsInverted(xs+ys, k, |xs|) {
                 assert ys == [ys[0]] + ys[1..];
@@ -916,20 +917,20 @@ module InversionDefs {
                 assert (sxs+sys)[|sxs|+j] == ys[0];
                 assert IsInverted(sxs+sys, 0, |sxs|+j);
                 JoinedWith2CardinalityEqualForOrderedAndUnordedSeqs(xs, ys[1..], sxs, sys[0..j] + sys[j+1..], k);
-                assert (k, |xs|) in JoinedWith2(xs, ys, k);
+                // assert (k, |xs|) in JoinedWith2(xs, ys, k);
                 JoinedWithSame(sxs, sys, 0);
                 assert (0, |sxs|+j) in JoinedWith(sxs, sys, 0);
-                assert (0, |sxs|+j) in JoinedWith2(sxs, sys, 0);
+                // assert (0, |sxs|+j) in JoinedWith2(sxs, sys, 0);
                 JoinedWith2MS(sxs, sys, 0, j);
-                assert |JoinedWith2(sxs, sys, 0)| == 1 + |JoinedWith2(sxs, sys[0..j] + sys[j+1..], 0)|;
+                // assert |JoinedWith2(sxs, sys, 0)| == 1 + |JoinedWith2(sxs, sys[0..j] + sys[j+1..], 0)|;
 
                 pairSetRmapLemma(JoinedWith2(xs, ys[1..], k), 1);
                 JoinedWith2Size(xs, ys, k);
-                assert |JoinedWith2(xs, ys[1..], k)| == |pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
-                assert JoinedWith2(xs, ys, k) == {(k, |xs|)}+pairSetRmap(JoinedWith2(xs, ys[1..], k), 1);
-                assert |JoinedWith2(xs, ys, k)| == 1+|pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
-                assert |JoinedWith2(xs, ys, k)| == 1 + |JoinedWith2(xs, ys[1..], k)|;
-            assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
+            //     assert |JoinedWith2(xs, ys[1..], k)| == |pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
+            //     assert JoinedWith2(xs, ys, k) == {(k, |xs|)}+pairSetRmap(JoinedWith2(xs, ys[1..], k), 1);
+            //     assert |JoinedWith2(xs, ys, k)| == 1+|pairSetRmap(JoinedWith2(xs, ys[1..], k), 1)|;
+            //     assert |JoinedWith2(xs, ys, k)| == 1 + |JoinedWith2(xs, ys[1..], k)|;
+            // assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
             }else{
 
                 assert ys == [ys[0]] + ys[1..];
@@ -949,8 +950,8 @@ module InversionDefs {
                 JoinedWith2MS(sxs, sys, 0, j);
                 pairSetRmapLemma(JoinedWith2(xs, ys[1..], k), 1);
                 JoinedWith2Size(xs, ys, k);
-                assert |JoinedWith2(xs, ys, k)| == |JoinedWith2(xs, ys[1..], k)|;
-            assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
+            //     assert |JoinedWith2(xs, ys, k)| == |JoinedWith2(xs, ys[1..], k)|;
+            // assert |JoinedWith2(sxs, sys, 0)| == |JoinedWith2(xs, ys, k)|;
 
             }
         }
@@ -1004,7 +1005,7 @@ module InversionDefs {
         ensures i+j < |left|+|right| && !(j == |right| || (i < |left| && left[i] <= right[j])) ==> count + |left| - i == |inversersionSetJoined(left, right[0..j+1])|
     {
         if i+j < |left|+|right| && (j >= |right| || (i < |left| && left[i] < right[j])) {
-            assert i+j < |left|+|right| && (j == |right| || (i < |left| && left[i] < right[j])) ==> count == |inversersionSetJoined(left, right[0..j])|;
+            // assert i+j < |left|+|right| && (j == |right| || (i < |left| && left[i] < right[j])) ==> count == |inversersionSetJoined(left, right[0..j])|;
         }else if i+j < |left|+|right| && !(j >= |right| || (i < |left| && left[i] < right[j])) {
             assert j < |right|;
             assert !(i < |left| && left[i] < right[j]);
@@ -1028,7 +1029,7 @@ module InversionDefs {
                         ensures x in inversersionSetJoined(left, right[0..j])
                     {
                         if x.1 == |left|+j {
-                            assert 0 <= x.0 < |left|;
+                            // assert 0 <= x.0 < |left|;
                             assert IsInverted(left+right[0..j+1], x.0, |left|+j);
                             assert false;
                         }else{
@@ -1051,7 +1052,7 @@ module InversionDefs {
                         ensures x in inversersionSetJoined(left, right[0..j+1])
                     {
                         if x in newpairs  {
-                            assert i <= x.0 < |left|;
+                            // assert i <= x.0 < |left|;
                             assert x.1 == |left|+j;
                             assert left[x.0] == (left+right[0..j+1])[x.0];
                             assert left[i] <= left[x.0];
@@ -1091,13 +1092,13 @@ module InversionDefs {
     }
 
     lemma PiecesEqual(xs: seq<int>, ys: seq<int>, sxs: seq<int>, sys: seq<int>, k: int)
-        requires multiset(xs) == multiset(sxs)
-        requires multiset(ys) == multiset(sys)
-        requires Sorted(sxs)
-        requires Sorted(sys)
+        // requires multiset(xs) == multiset(sxs)
+        // requires multiset(ys) == multiset(sys)
+        // requires Sorted(sxs)
+        // requires Sorted(sys)
         requires |sxs| > 0
-        requires |sxs| == |xs|
-        requires 0 <= k < |xs| && xs[k] == sxs[0]
+        // requires |sxs| == |xs|
+        requires 0 <= k < |xs| // && xs[k] == sxs[0]
         requires |inversersionSetJoined(xs[0..k] + xs[k+1..], ys)| == |inversersionSetJoined(sxs[1..], sys)|
         ensures |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)| == |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|
     {
@@ -1146,7 +1147,7 @@ module InversionDefs {
             var sortedInvs := inversersionSetJoined(sxs, sys);
             var sxsFirst := JoinedWith(sxs, sys, 0);
             inversersionSetJoinedFirsts(sxs, sys);
-            assert sxsFirst + pairSetMap2(inversersionSetJoined(sxs[1..], sys),1) == inversersionSetJoined(sxs, sys);
+            // assert sxsFirst + pairSetMap2(inversersionSetJoined(sxs[1..], sys),1) == inversersionSetJoined(sxs, sys);
             assert sxsFirst !! pairSetMap2(inversersionSetJoined(sxs[1..], sys),1) by {
                 forall pair | pair in pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)
                     ensures pair.0 != 0
@@ -1154,7 +1155,7 @@ module InversionDefs {
                     pairSetMap2Inverse(inversersionSetJoined(sxs[1..], sys), 1, pair);
                 }
             }
-            assert pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1) == inversersionSetJoined(sxs, sys) - sxsFirst;
+            // assert pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1) == inversersionSetJoined(sxs, sys) - sxsFirst;
             var xsRest := JoinedWith(xs, ys, k);
             inversionSetJoinedMiddle2(xs, ys, k);
             assert xsRest + pairKMap(inversersionSetJoined(xs[0..k]+xs[k+1..], ys),k,1) == inversersionSetJoined(xs, ys);
@@ -1165,10 +1166,10 @@ module InversionDefs {
             JoinedWithHeadAndSameSameSize(xs, ys, sxs, sys, k);
             assert |JoinedWith(sxs, sys, 0)| == |JoinedWith(xs, ys, k)|;
             assert |invs| == |xsRest| + |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)|;
-            assert |sortedInvs| == |sxsFirst| + |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|;
+            // assert |sortedInvs| == |sxsFirst| + |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|;
             assert |xsRest| == |sxsFirst|;
             PiecesEqual(xs, ys, sxs, sys, k);
-            assert |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)| == |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|;
+            // assert |pairKMap(inversersionSetJoined(xs[0..k] + xs[k+1..], ys), k, 1)| == |pairSetMap2(inversersionSetJoined(sxs[1..], sys), 1)|;
             assert |invs| == |sortedInvs|;
             assert |inversersionSetJoined(xs, ys)| == |inversersionSetJoined(sxs, sys)|;
         }

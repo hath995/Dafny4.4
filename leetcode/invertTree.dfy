@@ -25,10 +25,10 @@ module InvertBinaryTree {
     */
     import opened SeqCustom
     class TreeNode {
-        var val: int;
-        var left: TreeNode?;
-        var right: TreeNode?;
-        ghost var repr: set<TreeNode>;
+        var val: int
+        var left: TreeNode?
+        var right: TreeNode?
+        ghost var repr: set<TreeNode>
 
         constructor(val: int, left: TreeNode?, right: TreeNode?)
             requires left != null ==> left.Valid()
@@ -186,7 +186,6 @@ module InvertBinaryTree {
         forall node | node in root.repr 
             ensures exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j]
         {
-            assert node != null;
             if node == root {
                 assert PreorderTraversal(node) == PreorderTraversal(root)[0..|PreorderTraversal(root)|];
                 assert exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
@@ -345,7 +344,7 @@ module InvertBinaryTree {
 
     lemma {:verify true} childInRootRepr(root: TreeNode, child: TreeNode)
         requires root.Valid()
-        requires child != null && child != root && child in root.repr
+        requires child != root && child in root.repr
         // requires k < |PreorderTraversal(root)| && PreorderTraversal(root)[k] == child
         // ensures child.left != null ==> child.left in PreorderTraversal(root)
         // ensures child.right != null ==> child.right in PreorderTraversal(root)
@@ -377,9 +376,9 @@ module InvertBinaryTree {
 
     lemma {:verify true} childChildrenInRootRepr(root: TreeNode, child: TreeNode)
         requires root.Valid()
-        requires child != null && child != root && child in root.repr
+        requires child != root && child in root.repr
         ensures child.repr < root.repr
-        decreases root.repr;
+        decreases root.repr
     {
         childInRootRepr(root, child);
         if root.left != null && child in root.left.repr {
@@ -404,7 +403,7 @@ module InvertBinaryTree {
 
     lemma {:verify true} later(root: TreeNode, child: TreeNode, k: nat)
         requires root.Valid()
-        requires child != null && child != root && child in root.repr
+        requires child != root && child in root.repr
         requires k < |PreorderTraversal(root)| && PreorderTraversal(root)[k] == child
         // ensures child.left != null ==> exists j: nat :: k < j < |PreorderTraversal(root)| && PreorderTraversal(root)[j] == child.left
         // ensures child.right != null ==> exists j: nat :: k < j < |PreorderTraversal(root)| && PreorderTraversal(root)[j] == child.right
@@ -476,7 +475,7 @@ module InvertBinaryTree {
     lemma ChildNodesAreInRoot(root: TreeNode, child: TreeNode)
         requires root.Valid()
         requires (root.left != null && child == root.left) || (root.right != null && root.right == child)
-        ensures child in root.repr;
+        ensures child in root.repr
     {
 
     }
@@ -484,16 +483,16 @@ module InvertBinaryTree {
     lemma ChildChildrenNodesAreInRoot(root: TreeNode, child: TreeNode)
         requires root.Valid()
         requires (root.left != null && (child == root.left.left || child == root.left.right)) || (root.right != null && (root.right.left == child || root.right.right == child))
-        ensures child in root.repr;
+        ensures child in root.repr
     {
 
     }
 
     lemma ChildNodesAreValid(root: TreeNode, child: TreeNode)
         requires root.Valid()
-        requires child in root.repr;
+        requires child in root.repr
         decreases root.repr
-        ensures child.repr <= root.repr;
+        ensures child.repr <= root.repr
         ensures child.Valid()
     {
         if child == root {
