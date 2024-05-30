@@ -548,6 +548,14 @@ module InvertBinaryTree {
     {
 
     }
+    
+    lemma TreeUnionLemma2(nodes: seq<TreeNode>, node: TreeNode, childnode: TreeNode)
+        requires node in nodes
+        requires childnode in node.repr
+        ensures childnode in TreeUnion(nodes)
+    {
+
+    }
 
     lemma TreeUnionConcat(xs: seq<TreeNode>, ys: seq<TreeNode>)
         requires forall x :: x in xs ==> x.Valid()
