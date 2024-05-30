@@ -28,7 +28,7 @@ module InvertBinaryTree {
         var val: int
         var left: TreeNode?
         var right: TreeNode?
-        ghost var repr: set<TreeNode>
+        var repr: set<TreeNode>
 
         constructor(val: int, left: TreeNode?, right: TreeNode?)
             requires left != null ==> left.Valid()
