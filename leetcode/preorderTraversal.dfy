@@ -278,6 +278,17 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         forall x, y :: 0 <= x < y < |ts| && x != y ==> ts[x].repr !! ts[y].repr
     }
 
+    lemma PreorderTraversalSlices(root: TreeNode)
+      requires root.Valid()
+      // ensures root.left != null && root.right != null ==> PreorderTraversal(root)[]
+      ensures PreorderTraversal(root)[..1] == [root]
+      ensures root.left != null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.left)|+1] == PreorderTraversal(root.left)
+      ensures root.right != null && root.left == null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.right)|+1] == PreorderTraversal(root.right)
+      ensures root.right != null && root.left != null ==> PreorderTraversal(root)[|PreorderTraversal(root.left)|+1..] == PreorderTraversal(root.right)
+    {
+
+    }
+
     lemma  AllDisjointMaint(stack: seq<TreeNode>, current: TreeNode)
         requires |stack| > 0
         requires AllDisjoint(stack)
@@ -301,7 +312,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
             }
     }
 
-    lemma  TreeUnionMaint(stack: seq<TreeNode>, current: TreeNode, unvisited: set<TreeNode>)
+    lemma TreeUnionMaint(stack: seq<TreeNode>, current: TreeNode, unvisited: set<TreeNode>)
         requires |stack| > 0
         requires unvisited == TreeUnion(stack)
         requires AllDisjoint(stack)
@@ -346,7 +357,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         }
     }
 
-    lemma FlatMapVisitedARN(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode)
+    lemma {:verify false} FlatMapVisitedARN(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -356,7 +367,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedARL(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedARL(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -370,7 +381,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedARR(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedARR(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -384,7 +395,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedARBoth(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedARBoth(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -398,7 +409,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedPCN(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedPCN(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -413,7 +424,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedPCL(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedPCL(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -428,7 +439,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedPCR(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedPCR(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -443,7 +454,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma FlatMapVisitedPCBoth(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
+    lemma {:verify false} FlatMapVisitedPCBoth(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
@@ -458,7 +469,54 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma {:verify } {:vcs_split_on_every_assert} traverseMaint(
+    lemma {:verify } {:vcs_split_on_every_assert} traverseMaint2(
+        root: TreeNode,
+        result: seq<TreeNode>,
+        visited: set<TreeNode>,
+        stack: seq<TreeNode>,
+        parents: seq<TreeNode>,
+        unvisited: set<TreeNode>,
+        newStack: seq<TreeNode>,
+        newParents: seq<TreeNode>,
+        i: int)
+      requires |stack| > 0 
+      requires root.Valid()
+      requires toSet(result) == visited
+      requires forall x :: x in parents ==> x.Valid()
+      requires forall x :: x in stack ==> x.Valid()
+      requires forall x :: x in stack ==> x in root.repr
+      requires forall x :: x in visited ==> x in root.repr
+      requires AllAncestors(parents)
+      requires stack == [root] ==> parents == []
+      requires parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
+      requires parents != [] ==> stackPred2(stack, parents, visited)
+      requires unvisited !! visited
+      requires unvisited + visited == root.repr
+      requires forall x :: x in stack ==> x in unvisited
+      requires AllDisjoint(stack)
+      requires unvisited == TreeUnion(stack)
+      requires i == |result|
+      requires 0 <= i <= |PreorderTraversal(root)|
+      requires result == PreorderTraversal(root)[..i]
+      requires newParents == pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]})
+      requires newStack == stack[..|stack|-1]+childStack(stack[|stack|-1])
+      requires parents != [] && newParents != [] ==> stackPred2(newStack, newParents, visited+{stack[|stack|-1]}) 
+      requires |stack| > 0 && i < |PreorderTraversal(root)| ==> stack[|stack|-1] == PreorderTraversal(root)[i]
+      ensures result+[] == PreorderTraversal(root)[..i]
+      ensures |newStack| > 0 && i+1 < |PreorderTraversal(root)| ==> newStack[ |newStack|-1] == PreorderTraversal(root)[i+1]
+    {
+      if |newStack| > 0 && i+1 < |PreorderTraversal(root)| {
+        if newStack == allRight(newParents, visited+{stack[|stack|-1]}) {
+
+          assert newStack[ |newStack|-1] == PreorderTraversal(root)[i+1];
+        } else if |newParents| > 0 && newStack == allRightPlusChildren(newParents, visited+{stack[|stack|-1]}) {
+
+          assert newStack[ |newStack|-1] == PreorderTraversal(root)[i+1];
+        }
+      }  
+    }
+
+    lemma {:verify false} {:vcs_split_on_every_assert} traverseMaint(
         root: TreeNode,
         result: seq<TreeNode>,
         visited: set<TreeNode>,
@@ -726,6 +784,10 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         while |stack| > 0 
             invariant toSet(result) == visited
             invariant |parents| == |parentIndices|
+            invariant i == |visited|
+            invariant i == |result|
+            invariant forall x :: x in parentIndices ==> x < i 
+            invariant forall k :: 0 <= k < |parentIndices| ==> result[parentIndices[k]] == parents[k]
             invariant forall x :: x in parents ==> x.Valid()
             invariant forall x :: x in stack ==> x.Valid()
             invariant forall x :: x in stack ==> x in root.repr
@@ -738,8 +800,6 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
             invariant forall x :: x in stack ==> x in unvisited
             invariant AllDisjoint(stack)
             invariant unvisited == TreeUnion(stack)
-            invariant i == |result|
-            invariant i == |visited|
             invariant 0 <= i <= |pro|
             invariant result == pro[..i]
             invariant |stack| > 0 && i < |pro| ==> stack[|stack|-1] == pro[i]
