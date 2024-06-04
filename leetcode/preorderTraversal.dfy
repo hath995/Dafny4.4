@@ -64,11 +64,23 @@ module PreorderTraversal {
       if node.right != null then [node.right] else []
     }
 
-    function rightStackVisited(node: TreeNode, visited: set<TreeNode>): seq<TreeNode> 
+    function rightStackUnvisited(node: TreeNode, visited: set<TreeNode>): seq<TreeNode> 
         reads node
         // requires node.Valid()
     {
       if node.right != null && node.right !in visited then [node.right] else []
+    }
+
+    lemma rightStackUnvisitedLemma(node: TreeNode, visited: set<TreeNode>)
+      ensures rightStackUnvisited(node, visited) != [] ==> |rightStackUnvisited(node, visited)| == 1
+    {
+
+    }
+
+    predicate leftStackVisited(node: TreeNode, visited: set<TreeNode>) 
+      reads node
+    {
+      if node.left != null then node.left in visited else true
     }
 
     lemma childStackLemma(node: TreeNode?)
@@ -169,6 +181,105 @@ module PreorderTraversal {
       }
     }
 
+    lemma newStackNotEmptyImpliesParentsNotEmpty(parents: seq<TreeNode>, stack: seq<TreeNode>, visited: set<TreeNode>, unvisited: set<TreeNode>)
+      requires allLeftVisited(parents, visited)
+      requires stack != []
+      requires parents != []
+      requires parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
+      requires forall x :: x in parents ==> x.Valid()
+      requires forall x :: x in stack ==> x.Valid()
+      requires unvisited !! visited
+      requires forall x :: x in stack ==> x in unvisited
+      requires AllAncestors(parents)
+      requires AllDisjoint(stack)
+      requires unvisited == TreeUnion(stack)
+      // requires pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]}) == []
+      requires stack == allRight(parents, visited)
+      requires forall x :: x in stack ==> x.Valid()
+      ensures (stack[..|stack|-1] + childStack(stack[ |stack|-1]) != []) ==> pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]}) != []
+    {
+      if pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]}) == [] {
+        parentsEmptyImplyStackEmpty(parents, stack, visited, unvisited);
+
+      }
+
+    }
+
+    lemma parentsEmptyImplyStackEmpty(parents: seq<TreeNode>, stack: seq<TreeNode>, visited: set<TreeNode>, unvisited: set<TreeNode>)
+      requires stack != []
+      requires parents != []
+      requires parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
+      requires forall x :: x in parents ==> x.Valid()
+      requires forall x :: x in stack ==> x.Valid()
+      requires unvisited !! visited
+      requires forall x :: x in stack ==> x in unvisited
+      requires AllAncestors(parents)
+      requires AllDisjoint(stack)
+      requires unvisited == TreeUnion(stack)
+      requires pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]}) == []
+      // requires allLeftVisited(parents, visited)
+      requires stack == allRight(parents, visited)
+      ensures stack[..|stack|-1]+childStack(stack[|stack|-1]) == []
+
+    {
+      var current := stack[|stack|-1];
+        pruneParentsLemma2(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]});
+        assert forall x :: x in parents+parentStack(stack[|stack|-1]) ==> children(x) <= visited+{current};
+        if parentStack(stack[|stack|-1]) != [] {
+          assert children(current) <= visited+{current};
+          TreeUnionLemma(stack);
+          // assert forall x :: x in children(current) ==> x in current.repr && x in unvisited && x !in visited+{current};
+          childrenLemma(current);
+          // assert forall x :: x in children(current) ==> x in current.repr && x in unvisited;
+          assert forall x :: x in children(current) ==> x in current.repr;
+          assert forall x :: x in children(current) ==> x in unvisited by {
+            forall x | x in children(current)
+              ensures x in unvisited
+            {
+              TreeUnionLemma2(stack, current, x);
+            }
+          }
+          assert false;
+        }
+        assert parents+parentStack(stack[|stack|-1])  == parents;
+        // assert visited+{stack[|stack|-1]} == root.repr;
+        assert childStack(stack[|stack|-1]) == [];
+        assert stack[..|stack|-1] == [] by {
+          if stack[..|stack|-1] != [] {
+            if stack == allRight(parents, visited) {
+              allRightLemma(parents, visited);
+              assert stack == stack[..|stack|-1]+[current];
+              forall x | x in stack 
+                ensures x in visited+{current}
+              {
+                var i :| 0 <= i < |parents| && x in rightStackUnvisited(parents[i], visited);
+                assert x in children(parents[i]);
+                assert parents[i] in parents;
+                assert children(parents[i]) <= visited + {current};
+              }
+              assert visited !! unvisited;
+              forall x | x in stack[..|stack|-1] 
+                ensures x in visited
+              {
+                assert x in stack;
+                assert x in unvisited;
+                assert x in visited;
+
+              }
+              var somex :| somex in stack[..|stack|-1];
+              assert somex in visited;
+              assert false;
+            } else if stack == allRightPlusChildren(parents, visited) {
+              allRightPlusChildrenLemma(parents, visited);
+              var somex :| somex in stack[..|stack|-1];
+              assert somex in visited;
+              assert false;
+            }
+          }
+        }
+        assert stack[..|stack|-1]+childStack(stack[|stack|-1]) == [];
+    }
+
   predicate compare(a: TreeNode, b: TreeNode)
     reads a, b
   {
@@ -179,6 +290,26 @@ module PreorderTraversal {
       reads set i | 0 <= i < |ts| :: ts[i]
   {
     forall i :: 0 <= i < |ts|-1 ==> childOf(ts[i+1], ts[i])
+  }
+
+  lemma AllAncestorsLemma(ts: seq<TreeNode>, i: int, j : int)
+    requires forall x :: x in ts ==> x.Valid()
+    requires AllAncestors(ts)
+    requires 0 <=i < j < |ts|
+    ensures ts[j].repr < ts[i].repr
+    ensures ts[j] in ts[i].repr
+  {
+    // assert childOf(ts[j], ts[j-1]);
+    assert ts[j-1] in ts;
+    assert ts[j] in ts[j-1].repr;
+    if j-1 > i {
+
+    AllAncestorsLemma(ts, i, j-1);
+    assert ts[j-1] in ts;
+    // assert ts[j-1].repr
+    }else{
+
+    }
   }
 
   predicate AllAncestorsDesc(ts: seq<TreeNode>) 
@@ -357,14 +488,122 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         }
     }
 
-    lemma {:verify false} FlatMapVisitedARN(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode)
+    lemma {:verify } {:vcs_split_on_every_assert} FlatMapVisitedARN(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, unvisited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
       requires |stack| > 0 
       requires current == stack[|stack|-1]
       requires current !in visited
       requires current.Valid()
-      requires stack == Seq.Flatten(Seq.Map((x: TreeNode) reads x => rightStackVisited(x, visited), parents))
-      ensures stack[..|stack|-1] == allRight(pruneParents(parents+parentStack(current), visited+{current}), visited+{current})
+      requires AllDisjoint(stack)
+      requires forall x :: x in parents ==> x.Valid() && x in visited
+      requires forall x :: x in stack ==> x.Valid()
+      requires forall x :: x in stack ==> x in unvisited
+      requires unvisited !! visited
+      requires unvisited == TreeUnion(stack)
+      requires AllAncestors(parents)
+      requires |parents| > 0
+      requires parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
+      requires childStack(current) == []
+      requires allLeftVisited(parents, visited)
+      requires stack == Seq.Flatten(Seq.Map((x: TreeNode) reads x => rightStackUnvisited(x, visited), parents))
+
+      requires newParents == pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]})
+      requires newStack == stack[..|stack|-1] + childStack(stack[ |stack|-1])
+      ensures stackPred2(newStack, newParents, visited+{current})
     {
+      assert parentStack(current) == [];
+      assert allRight(parents, visited) == stack;
+      assert parents+parentStack(current) == parents;
+      assert rightStackUnvisited(parents[ |parents| -1], visited) == [stack[ |stack| - 1]] by {
+        var ms := Seq.Map((x: TreeNode) reads x => rightStackUnvisited(x, visited), parents);
+        assert ms == ms[..|ms|-1]+[rightStackUnvisited(parents[ |parents| -1], visited)];
+        Seq.LemmaFlattenConcat(ms[..|ms|-1],[rightStackUnvisited(parents[ |parents| -1], visited)]);
+        assert stack == Seq.Flatten(ms[..|ms|-1])+Seq.Flatten([rightStackUnvisited(parents[ |parents| -1], visited)]);
+        assert Seq.Flatten([rightStackUnvisited(parents[ |parents| -1], visited)]) == rightStackUnvisited(parents[ |parents| -1], visited);
+        assert rightStackUnvisited(parents[ |parents| -1], visited) != [] by {
+          assert childOf(stack[|stack|-1], parents[|parents|-1]);
+          if stack[|stack|-1] == parents[|parents|-1].left {
+            allRightLemma(parents, visited);
+            assert stack[|stack|-1] in allRight(parents, visited);
+            var i :| 0 <= i < |parents| && stack[|stack|-1] in rightStackUnvisited(parents[i], visited);
+            assert  parents[|parents|-1].left != null;
+            assert parents[|parents|-1] in parents;
+            assert parents[i] in parents;
+            assert parents[i].Valid();
+            assert stack[|stack|-1] in parents[|parents|-1].repr;
+            if i != |parents|-1 {
+              // assert stack []
+              if rightStackUnvisited(parents[ |parents| -1], visited) == [] {
+                // assume parents[|parents|-1] in parents[i].repr; 
+                AllAncestorsLemma(parents, i, |parents|-1);
+                assert stack[|stack|-1] == parents[i].right;
+                assert parents[i].right != null;
+                
+                if parents[|parents|-1] in parents[i].right.repr {
+                  assert parents[|parents|-1] in visited && parents[|parents|-1] in unvisited;
+                } else if parents[i].left != null && parents[|parents|-1] in parents[i].left.repr {
+                  childChildrenInRootRepr(parents[i].left, parents[|parents|-1]);
+                  assert parents[|parents|-1].repr < parents[i].left.repr;
+                  assert stack[|stack|-1] in parents[i].left.repr && stack[|stack|-1] in parents[i].right.repr;
+                  assert !parents[i].Valid();
+                }else {
+                  assert parents[|parents|-1] !in parents[i].right.repr;
+                  assert parents[i].left == null || parents[|parents|-1] !in parents[i].left.repr;
+                  assert (parents[i].repr == {parents[i]}+parents[i].left.repr + parents[i].right.repr) || (parents[i].repr == {parents[i]} + parents[i].right.repr);
+                  assert parents[|parents|-1] == parents[i];
+                  assert !parents[i].Valid();
+                }
+
+                // assert allRight(parents, visited) != stack;
+                assert false;
+
+              }else{
+                rightStackUnvisitedLemma(parents[ |parents| -1], visited);
+                assert rightStackUnvisited(parents[ |parents| -1], visited) != [];
+                assert |rightStackUnvisited(parents[ |parents| -1], visited)| == 1;
+                assert |stack| == |Seq.Flatten(ms[..|ms|-1])| + 1;
+                assert parents[i] in parents;
+                assert stack[|stack|-1] == parents[i].right;
+                assert stack[|stack|-1] in parents[i].repr;
+                assert i < |parents|-1;
+                assert parents[i] in parents[..|parents|-1];
+                //assert allRight(parents[..|parents|-1], visited);
+                // var k :| 0 <= k < |parents|-1 && parents[..|parents|-1][k] == parents[i];
+                assert stack[|stack|-1] in Seq.Flatten(ms[..|ms|-1]);
+                // flattenLemma(ms[..|ms|-1], stack[|stack|-1]);
+                var k :| 0 <= k < |Seq.Flatten(ms[..|ms|-1])| && Seq.Flatten(ms[..|ms|-1])[k] == stack[|stack|-1];
+                assert stack[k] == stack[|stack|-1];
+
+                assert !AllDisjoint(stack);
+              }
+            assert false;
+            }else{
+              assert stack[|stack|-1] !in rightStackUnvisited(parents[i], visited);
+            assert false;
+            }
+            assert false;
+          }
+        }
+      }
+      assert newStack == stack[..|stack|-1];
+      assert stack[ |stack| - 1] == parents[ |parents| -1].right;
+      if newStack == [] {
+      assume newParents == [];
+      assert newStack  == allRight(newParents, visited+{current});
+      assert allLeftVisited(newParents, visited+{current});
+
+      }else{
+        newStackNotEmptyImpliesParentsNotEmpty(parents, stack, visited, unvisited);
+        assert newParents != [];
+        assert newStack != [];
+      assert newStack  == allRight(newParents, visited+{current}) by {
+        forall x | x in newParents 
+          ensures x in parents
+        {
+
+          }
+      }
+      assert allLeftVisited(newParents, visited+{current});
+      }
     }
 
     lemma {:verify false} FlatMapVisitedARL(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>, current: TreeNode, newStack: seq<TreeNode>, newParents: seq<TreeNode>)
@@ -469,7 +708,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     {
     }
 
-    lemma {:verify } {:vcs_split_on_every_assert} traverseMaint2(
+    lemma {:verify false} {:vcs_split_on_every_assert} traverseMaint2(
         root: TreeNode,
         result: seq<TreeNode>,
         visited: set<TreeNode>,
@@ -588,8 +827,8 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         // assert childOf(newStack[|newStack|-1], newParents[|newParents|-1]);
         assert stackPred2(newStack, newParents, visited+{current}) by {
           childStackLemma(current);
-          var visitMap := (x: TreeNode) reads x => rightStackVisited(x, visited);
-          var newVisitMap := (x: TreeNode) reads x => rightStackVisited(x, visited+{current});
+          var visitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited);
+          var newVisitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited+{current});
           if stack == allRight(parents, visited) {
             if childStack(current) == [current.right, current.left] {
               FlatMapVisitedARBoth(stack, parents, visited, current, newStack, newParents);
@@ -599,7 +838,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
             }else if childStack(current) == [current.right] {
               FlatMapVisitedARR(stack, parents, visited, current, newStack, newParents);
             }else if childStack(current) == [] {
-              FlatMapVisitedARN(stack, parents, visited, current);
+              FlatMapVisitedARN(stack, parents, visited, unvisited, current, newStack, newParents);
               assert newStack == Seq.Flatten(Seq.Map(newVisitMap, newParents));
               assert stackPred2(newStack, newParents, visited+{current});
             }
@@ -649,7 +888,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
               forall x | x in stack 
                 ensures x in visited+{current}
               {
-                var i :| 0 <= i < |parents| && x in rightStackVisited(parents[i], visited);
+                var i :| 0 <= i < |parents| && x in rightStackUnvisited(parents[i], visited);
                 assert x in children(parents[i]);
                 assert parents[i] in parents;
                 assert children(parents[i]) <= visited + {current};
@@ -688,7 +927,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     function allRight(parents: seq<TreeNode>, visited: set<TreeNode>): seq<TreeNode> 
       reads parents, set i | 0 <= i < |parents| :: parents[i], reprUnion(parents)
     {
-      var visitMap := (x: TreeNode) reads x => rightStackVisited(x, visited);
+      var visitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited);
       Seq.Flatten(Seq.Map(visitMap, parents))
     }
 
@@ -720,13 +959,13 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
     }
 
     lemma allRightLemma(parents: seq<TreeNode>, visited: set<TreeNode>)
-      ensures forall x :: x in allRight(parents, visited) ==> exists i :: 0 <= i < |parents| && x in rightStackVisited(parents[i], visited)
+      ensures forall x :: x in allRight(parents, visited) ==> exists i :: 0 <= i < |parents| && x in rightStackUnvisited(parents[i], visited)
     {
       forall x | x in allRight(parents, visited)
-        ensures exists i :: 0 <= i < |parents| && x in rightStackVisited(parents[i], visited)
+        ensures exists i :: 0 <= i < |parents| && x in rightStackUnvisited(parents[i], visited)
       {
-      var visitMap := (x: TreeNode) reads x => rightStackVisited(x, visited);
-        assert forall  k :: 0 <= k < |parents| ==> Seq.Map(visitMap, parents)[k] == rightStackVisited(parents[k], visited);
+      var visitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited);
+        assert forall  k :: 0 <= k < |parents| ==> Seq.Map(visitMap, parents)[k] == rightStackUnvisited(parents[k], visited);
         flattenLemma(Seq.Map(visitMap, parents), x);
       }
     }
@@ -736,7 +975,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
       requires |parents| > 0
       requires forall parent :: parent in parents ==> parent.Valid()
     {
-      var visitMap := (x: TreeNode) reads x => rightStackVisited(x, visited);
+      var visitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited);
       Seq.Flatten(Seq.Map(visitMap, parents[..|parents|-1]))+childStack(parents[|parents|-1])
     }
 
@@ -749,10 +988,10 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         ensures exists i :: 0 <= i < |parents| && x in children(parents[i])
       {
         //Seq.Flatten(Seq.Map(visitMap, parents[..|parents|-1]))+childStack(parents[|parents|-1])
-        var visitMap := (x: TreeNode) reads x => rightStackVisited(x, visited);
+        var visitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited);
         if x in Seq.Flatten(Seq.Map(visitMap, parents[..|parents|-1])) {
         allRightLemma(parents[..|parents|-1], visited);
-        assert forall x :: x in allRight(parents[..|parents|-1], visited) ==> exists k :: 0 <= k < |parents[..|parents|-1]| && x in rightStackVisited(parents[..|parents|-1][k], visited);
+        assert forall x :: x in allRight(parents[..|parents|-1], visited) ==> exists k :: 0 <= k < |parents[..|parents|-1]| && x in rightStackUnvisited(parents[..|parents|-1][k], visited);
         }else{
           assert x in childStack(parents[|parents|-1]);
           assert x in children(parents[|parents|-1]);
@@ -760,11 +999,17 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
       }
     }
 
+    predicate allLeftVisited(parents: seq<TreeNode>, visited: set<TreeNode>) 
+      reads parents, set i | 0 <= i < |parents| :: parents[i]
+    {
+      forall p :: p in parents ==> leftStackVisited(p, visited)
+    }
+
     predicate stackPred2(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>) 
       reads parents, set i | 0 <= i < |parents| :: parents[i], reprUnion(parents)
       requires forall parent :: parent in parents ==> parent.Valid()
     {
-      stack == allRight(parents, visited) || (|parents| > 0 && stack == allRightPlusChildren(parents, visited))
+      (stack == allRight(parents, visited) && allLeftVisited(parents, visited)) || (|parents| > 0 && stack == allRightPlusChildren(parents, visited) && allLeftVisited(parents[..|parents|-1], visited))
     }
     
     method {:verify false} {:vcs_split_on_every_assert} Traverse(root: TreeNode) returns (result: seq<TreeNode>)
