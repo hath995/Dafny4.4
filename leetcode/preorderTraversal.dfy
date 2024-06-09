@@ -1009,45 +1009,85 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
       reads parents, set i | 0 <= i < |parents| :: parents[i], reprUnion(parents)
       requires forall parent :: parent in parents ==> parent.Valid()
     {
-      (stack == allRight(parents, visited) && allLeftVisited(parents, visited)) || (|parents| > 0 && stack == allRightPlusChildren(parents, visited) && allLeftVisited(parents[..|parents|-1], visited))
+      (stack == allRight(parents, visited) && allLeftVisited(parents, visited))
+      || (|parents| > 0 && stack == allRightPlusChildren(parents, visited) && allLeftVisited(parents[..|parents|-1], visited))
     }
+
+    /**
+      This is the main algorithm I am trying to verify as iteratively equivalent to PreorderTraversal. 
+      In it's basic form as it would be implemented in most languages it should be equivalent to TraverseBasic.
+      However, to verify the algorithm many ghost variables are needed to show what the implicit relationships are 
+      between the variables.
+
+      To experiment with the invariants I have made the ghost variables real. I have also added print statements to 
+      show the state of the variables at each iteration. Then the challenge is to inductively show the relationships
+      between all the ghost variables are maintained.
+
+
+      requires parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
+     */
     
-    method {:verify false} {:vcs_split_on_every_assert} Traverse(root: TreeNode) returns (result: seq<TreeNode>)
+    method {:verify } {:vcs_split_on_every_assert} Traverse(root: TreeNode) returns (result: seq<TreeNode>)
         requires root.Valid()
         ensures result == PreorderTraversal(root)
     {
+        //The stack of nodes to visit next
         var stack := [root];
+        //the full preorder generated just for comparisons
         var pro := PreorderTraversal(root);
         assert |pro| == root.TreeSize();
         var i := 0;
         result := [];
+        //This set will include all the TreeNodes that have been visited by the algorithm
         var visited: set<TreeNode> := {};
+        //This set is all the nodes in Root's entire tree that have not been visited yet
         var unvisited: set<TreeNode> := root.repr;
         assert |unvisited| == |root.repr|;
+        //These are the parent nodes for all the nodes currently in the stack (generally)
+        //Specifically I think they should fulfill the predicate StackPred2
+        // and they should form a path from root to the current node
         var parents: seq<TreeNode> := [];
+        // This is an idea I was playing with but may not be going anywhere with
+        // The idea here is that the indices of parent nodes in the preordertraversal might be useful to tell us something
         var parentIndices: seq<int> := [];
         while |stack| > 0 
+            /*verifies */
             invariant toSet(result) == visited
-            invariant |parents| == |parentIndices|
+            // invariant |parents| == |parentIndices|
+            /*verifies */
             invariant i == |visited|
+            /*verifies */
             invariant i == |result|
+            /*verifies */
             invariant forall x :: x in parentIndices ==> x < i 
-            invariant forall k :: 0 <= k < |parentIndices| ==> result[parentIndices[k]] == parents[k]
+            // invariant forall k :: 0 <= k < |parentIndices| ==> result[parentIndices[k]] == parents[k]
+            /*verifies */
             invariant forall x :: x in parents ==> x.Valid()
+            /*verifies */
             invariant forall x :: x in stack ==> x.Valid()
+            /*verifies */
             invariant forall x :: x in stack ==> x in root.repr
+            /*verifies */
             invariant forall x :: x in visited ==> x in root.repr
+            /*verifies */
             invariant unvisited !! visited
+            /*verifies */
             invariant unvisited + visited == root.repr
+            /*verifies */
             invariant visited <= root.repr
+            /*verifies */
             invariant |visited| <= |root.repr|
 
+            /*verifies */
             invariant forall x :: x in stack ==> x in unvisited
+            /*verifies */
             invariant AllDisjoint(stack)
+            /*verifies */
             invariant unvisited == TreeUnion(stack)
+            /*verifies */
             invariant 0 <= i <= |pro|
-            invariant result == pro[..i]
-            invariant |stack| > 0 && i < |pro| ==> stack[|stack|-1] == pro[i]
+            // invariant result == pro[..i]
+            // invariant |stack| > 0 && i < |pro| ==> stack[|stack|-1] == pro[i]
             decreases |root.repr| - i
         {
             print "i: ", i, "\n";
@@ -1112,17 +1152,6 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
             // }
             parents := pruneParents(parents, visited);
           
-            // if (|parents| > 0) && (children(parents[|parents|-1]) <= visited)
-            // {
-            //     parents := parents[..|parents|-1];
-            //     // parentIndices := parentIndices[..|parentIndices|-1];
-            // }
-
-            // if (|parents| > 0) && (children(parents[|parents|-1]) <= visited)
-            // {
-            //     parents := parents[..|parents|-1];
-            //     // parentIndices := parentIndices[..|parentIndices|-1];
-            // }
             assume {:axiom} forall p :: p in parents ==> p.Valid();
          
 
@@ -1138,6 +1167,37 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         return result;
     }
 
+method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNode>)
+        requires root.Valid()
+        ensures result == PreorderTraversal(root)
+    {
+        var stack := [root];
+        while |stack| > 0 
+        {
+            var current := stack[|stack|-1];
+            //The following was extracted into the function childStack();
+            var stack' := [];
+            if current.right != null {
+                stack' := stack' + [current.right];
+            }
+            if current.left != null {
+                stack' := stack' + [current.left];
+            }
+            stack := stack[..|stack|-1]+stack';
+            result := result + [current];
+        }
+        return result;
+    }
+
+
+    /*
+        By hitting F5 Dafny will attempt to run code in a Main method. You will need to add --standard-libraries to
+        the run command to execute because of the imported flatten and map functions.
+
+        This is very useful to test invariants.
+        "expect" statements are the run time dual of "assert" statements. As in asserts task the verifier must test to be 
+        true. Where as "expect" statements must be tested to be true during runtime.
+    */
     method Main() 
     {
         var u := new TreeNode(20, null, null);
