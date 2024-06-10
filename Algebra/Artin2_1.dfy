@@ -106,16 +106,41 @@ module Artin {
 
 
     lemma areInverses<A(!new)>(g: Group<A>, a: A,  b: A)
-        requires ValidGroup(g)
+        // requires ValidGroup(g)
         requires a in g.elements && b in g.elements
         requires inGroup(g,a) && inGroup(g,b)
         requires g.compose(a, b) == g.identity && g.compose(b,a) == g.identity
         ensures g.inverse(a) == b && g.inverse(b) == a
     {
         var x := g.inverse(b);
+        GroupInverse(g, b);
+        GroupInverse(g, a);
+        GroupContainsInverse(g, b);
+        GroupAssociativeComposition(g, a, b, x);
+        GroupClosedComposition(g, a, b);
+        GroupIdentity(g, x);
+        GroupIdentity(g, a);
+        GroupIdentity(g, b);
         calc {
+            x;
+            g.compose(g.identity, x);
             g.compose(g.compose(a,b), x);
-            g.compose(a, g.compose(b,x));
+            g.compose(a,g.compose(b, x));
+            g.compose(a, g.identity);
+            a;
+        }
+
+        var y := g.inverse(a);
+        GroupContainsInverse(g, a);
+        GroupIdentity(g, y);
+        GroupAssociativeComposition(g, y, a, b);
+        calc {
+            y;
+            g.compose(y, g.identity);
+            g.compose(y, g.compose(a,b));
+            g.compose(g.compose(y, a),b);
+            g.compose(g.identity, b);
+            b;
         }
     }
 
@@ -160,7 +185,7 @@ module Artin {
     }
 
     lemma {:verify true} groupCompositionInverse<A(!new)>(g: Group<A>, a: A, b: A, abar: A, bbar: A, abbar: A)
-        requires ValidGroup(g)
+        // requires ValidGroup(g)
         requires inGroup(g, a)
         requires inGroup(g,b)
         requires g.inverse(a) == abar
@@ -168,17 +193,44 @@ module Artin {
         requires g.inverse(g.compose(a,b)) == abbar
         ensures abbar == g.compose(bbar, abar)
     {
-        // calc {
-        //     g.compose(g.compose(a, b), g.compose(bbar, abar));
-        //     ==
-        //     g.compose(a, g.compose(g.compose(b, bbar),abar));
-        //     ==
-        //     g.compose(a, g.compose(g.identity,abar));
-        //     ==
-        //     g.compose(a, abar);
-        //     ==
-        //     g.identity;
-        // }
+        GroupContainsInverse(g, a);
+        GroupContainsInverse(g, b);
+        GroupInverse(g, a);
+        GroupInverse(g, b);
+        GroupIdentity(g, abar);
+        GroupIdentity(g, b);
+        GroupClosedComposition(g, bbar, abar);
+        GroupClosedComposition(g, a, b);
+        GroupContainsInverse(g, g.compose(a,b));
+        GroupInverse(g, a);
+        GroupAssociativeComposition(g, b, bbar, abar );
+        GroupAssociativeComposition(g, a, b, g.compose(bbar, abar));
+        calc {
+            g.compose(g.compose(a, b), g.compose(bbar, abar));
+            g.compose(a, g.compose(b, g.compose(bbar, abar)));
+            g.compose(a, g.compose(g.compose(b, bbar),abar));
+            ==
+            g.compose(a, g.compose(g.identity,abar));
+            ==
+            g.compose(a, abar);
+            ==
+            g.identity;
+        }
+
+        // GroupAssociativeComposition(g, b, bbar, abar );
+        GroupAssociativeComposition(g, g.compose(bbar, abar), a,b);
+        GroupAssociativeComposition(g, bbar, abar, g.compose(a,b));
+        GroupAssociativeComposition(g, abar, a, b);
+        calc {
+            g.compose(g.compose(bbar, abar), g.compose(a, b));
+            g.compose(bbar, g.compose(abar, g.compose(a, b)));
+            g.compose(bbar, g.compose(abar, g.compose(a, b)));
+            g.compose(bbar, g.compose(g.compose(abar, a), b));
+            g.compose(bbar, g.compose(g.identity, b));
+            g.compose(bbar, b);
+            g.identity;
+        }
+        areInverses(g, g.compose(a,b), g.compose(bbar, abar));
     }
     /*
 function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
@@ -188,12 +240,98 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
 }
     */
 
+    function npow<A>(g: Group, elem: A, n: nat): A
+        ensures n == 0 ==> npow(g,elem,n) == g.identity
+    {
+        if n == 0 then g.identity else g.compose(elem, apow(g, elem, n-1)) 
+    }
+    lemma npowPos<A>(g: Group, elem: A, n: int)
+        requires n > 0
+        requires inGroup(g, elem)
+        ensures npow(g,elem,n) == g.compose(npow(g, elem, n-1), elem)
+    {
+        GroupIdentity(g, elem);
+        if n == 1 {
+            calc {
+                npow(g,elem,n);
+                g.compose(elem, npow(g, elem, 0));
+                g.compose(elem, g.identity);
+                elem;
+            }
+            calc {
+                g.compose(npow(g, elem, n-1), elem);
+            }
+
+        }else{
+            npowPos(g, elem, n-1);
+            assume npow(g, elem, n-2) in g.elements;
+            GroupAssociativeComposition(g, elem, npow(g, elem, n-2), elem);
+            calc {
+                npow(g,elem,n);
+                g.compose(elem, npow(g, elem, n-1));
+                g.compose(elem, g.compose(npow(g, elem, n-2), elem));
+                g.compose(g.compose(elem,npow(g, elem, n-2)), elem);
+                g.compose(npow(g, elem, n-1), elem);
+            }
+        }
+    }
+
+    function zpow<A>(g: Group, elem: A, z: int): A
+    {
+        if z >= 0 then npow(g, elem, z) else g.inverse(npow(g, elem, -z))
+    }
+
     //apow is short for abstract power
     function apow<A>(g: Group, elem: A, n: int): A
         decreases if n > 0 then n else -n
         ensures n == 0 ==> apow(g,elem,n) == g.identity
     {
         if n == 0 then g.identity else if n > 0 then g.compose(elem, apow(g, elem, n-1)) else if n < 0 then g.compose(g.inverse(elem), apow(g, elem, n+1)) else g.identity
+    }
+
+    lemma zandapowEqual<A(!new)>(g: Group, elem: A, z: int)
+        requires inGroup(g, elem)
+        requires inGroup(g, g.identity)
+        requires isIdentity(g)
+        decreases z * z
+        ensures apow(g, elem, z) == zpow(g, elem, z)
+    {
+        if z >= 0 {
+            assert apow(g, elem, z) == zpow(g, elem, z);
+        }else{
+            if z == -1 {
+                GroupContainsInverse(g, elem);
+                onePower(g, elem);
+                assert g.identity == apow(g, elem, 0);
+                assert elem == apow(g, elem, 1);
+                calc{
+                    apow(g, elem, -1);
+                    g.compose(g.inverse(elem), apow(g, elem, -1+1));
+                    g.compose(g.inverse(elem), g.identity);
+                    g.inverse(elem);
+                }
+                assert g.inverse(elem) == apow(g, elem, -1);
+                assert apow(g, elem, z) == zpow(g, elem, z);
+            }else{
+                zandapowEqual(g,elem, z+1);
+                apowClosed(g, elem, z+1);
+                GroupContainsInverse(g, elem);
+                calc {
+                    zpow(g, elem, z);
+                    g.inverse(npow(g, elem, -z));
+                }
+                assert g.inverse(npow(g, elem, -(z+1))) == apow(g, elem, z+1);
+                calc {
+                    apow(g, elem, z);
+                    g.compose(g.inverse(elem), apow(g, elem, z+1));
+                    g.compose(g.inverse(elem), g.inverse(npow(g, elem, -(z+1))));
+                    g.compose(g.inverse(elem), zpow(g, elem, (z+1)));
+                    {zpowInverseComposeTwo(g, elem, z);}
+                    zpow(g, elem,z);
+                }
+                assert apow(g, elem, z) == zpow(g, elem, z);
+            }
+        }
     }
 
     lemma apowPos<A>(g: Group, elem: A, n: int)
@@ -387,6 +525,104 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
                 == {apowAddition(g,elem, n-1,k);}
                 g.compose(elem, apow(g, elem, n-1+k));
                 apow(g, elem, n+k);
+            }
+        }
+    }
+
+    lemma npowInverse<A(!new)>(g: Group<A>, elem: A, n: int)
+        requires n > 0
+        requires elem in g.elements
+        // requires ValidGroup(g)
+        ensures g.inverse(npow(g,elem, n)) == zpow(g, elem, -n)
+    {
+
+    }
+
+    lemma zpowInverseCompose<A(!new)>(g: Group<A>, elem: A, z: int)
+        requires z < 0
+        requires elem in g.elements
+        decreases -z
+        ensures g.compose(zpow(g, elem, (z+1)), g.inverse(elem)) == zpow(g, elem, z)
+    {
+        if z < -1 {
+        assume npow(g,elem, -(z+1)) in g.elements;
+        // zpowInverseCompose(g, elem, z+1);
+        assert zpow(g, elem, z+1) == g.inverse(npow(g, elem, -(z+1)));
+        calc{
+            zpow(g, elem, z);
+            g.inverse(npow(g,elem, -z));
+            g.inverse(g.compose(elem, npow(g,elem, -(z+1))));
+            {groupCompositionInverse(g, elem, npow(g,elem, -(z+1)), g.inverse(elem), g.inverse(npow(g,elem, -(z+1))), g.inverse(g.compose(elem, npow(g,elem, -(z+1)))));}
+            g.compose(g.inverse(npow(g,elem, -(z+1))), g.inverse(elem));
+            g.compose(zpow(g,elem, z+1), g.inverse(elem));
+        }
+        assert g.compose(zpow(g, elem, (z+1)), g.inverse(elem)) == zpow(g, elem, z);
+        }else if z == -1 {
+            assert npow(g, elem, 0) == g.identity;
+            GroupInverse(g, elem);
+            GroupContainsInverse(g, elem);
+            GroupIdentity(g, elem);
+            GroupIdentity(g, g.inverse(elem));
+            calc{
+                zpow(g, elem, z);
+                g.inverse(npow(g,elem, -z));
+                g.inverse(g.compose(elem, npow(g,elem, 0)));
+                g.inverse(g.compose(elem, g.identity));
+                g.inverse(elem);
+            }
+            calc {
+                g.compose(zpow(g, elem, (z+1)), g.inverse(elem));
+                g.compose(zpow(g, elem, 0), g.inverse(elem));
+                g.compose(g.identity, g.inverse(elem));
+                g.inverse(elem);
+            }
+
+        assert g.compose(zpow(g, elem, (z+1)), g.inverse(elem)) == zpow(g, elem, z);
+        }
+    }
+
+    lemma zpowInverseComposeTwo<A(!new)>(g: Group<A>, elem: A, z: int)
+        requires z < 0
+        requires elem in g.elements
+        requires inGroup(g, elem)
+        decreases -z
+        ensures g.compose(g.inverse(elem), zpow(g, elem, (z+1))) == zpow(g, elem, z)
+    {
+        if z == -1 {
+            assert npow(g, elem, 0) == g.identity;
+            GroupInverse(g, elem);
+            GroupContainsInverse(g, elem);
+            GroupIdentity(g, elem);
+            GroupIdentity(g, g.inverse(elem));
+            calc{
+                zpow(g, elem, z);
+                g.inverse(npow(g,elem, -z));
+                g.inverse(g.compose(elem, npow(g,elem, 0)));
+                g.inverse(g.compose(elem, g.identity));
+                g.inverse(elem);
+            }
+            calc {
+                g.compose(g.inverse(elem), zpow(g, elem, (z+1)));
+                g.compose(g.inverse(elem), zpow(g, elem, 0));
+                g.compose(g.inverse(elem), g.identity);
+                g.inverse(elem);
+            }
+            assert g.compose(g.inverse(elem), zpow(g, elem, (z+1))) == zpow(g, elem, z);
+        }else{
+            assume npow(g, elem, -(z+2)) in g.elements;
+            assume npow(g, elem, -(z+1)) in g.elements;
+            calc {
+            zpow(g, elem, z);
+            g.inverse(npow(g,elem, -z));
+            g.inverse(g.compose(elem, npow(g,elem, -(z+1))));
+            {npowPos(g, elem, -(z+1));}
+            g.inverse(g.compose(elem, g.compose(npow(g, elem, -(z+2)), elem)));
+            { GroupAssociativeComposition(g, elem, npow(g, elem, -(z+2)), elem);}
+            g.inverse( g.compose( g.compose( elem, npow(g, elem, -(z+2)) ), elem));
+            g.inverse( g.compose( npow(g, elem, -(z+1)), elem));
+            {groupCompositionInverse(g, npow(g, elem, -(z+1)), elem, g.inverse(npow(g, elem, -(z+1))), g.inverse(elem), g.inverse( g.compose( npow(g, elem, -(z+1)), elem)));}
+            g.compose(g.inverse(elem), g.inverse(npow(g, elem, -(z+1))));
+            g.compose(g.inverse(elem), zpow(g, elem, z+1));
             }
         }
     }
