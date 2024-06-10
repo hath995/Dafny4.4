@@ -1006,6 +1006,12 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
       forall p :: p in parents ==> leftStackVisited(p, visited)
     }
 
+    predicate allLeftReprVisited(parents: seq<TreeNode>, visited: set<TreeNode>) 
+      reads parents, set i | 0 <= i < |parents| :: parents[i], set i | 0 <= i < |parents| :: parents[i].left
+    {
+      forall p :: p in parents ==> forall c :: c in (if p.left != null then p.left.repr else {}) ==> c in visited
+    }
+
     predicate stackPred2(stack: seq<TreeNode>, parents: seq<TreeNode>, visited: set<TreeNode>) 
       reads parents, set i | 0 <= i < |parents| :: parents[i], reprUnion(parents)
       requires forall parent :: parent in parents ==> parent.Valid()
@@ -1024,21 +1030,65 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
       show the state of the variables at each iteration. Then the challenge is to inductively show the relationships
       between all the ghost variables are maintained.
 
+      The overarching goal is the prove the following two invariants.
+      pro is abbreviation for PreorderTraversal(root)
+      invariant result == pro[..i]
+      invariant |stack| > 0 && i < |pro| ==> stack[|stack|-1] == pro[i]
+
+      If we can do this then Traverse will verify. Invariant 1 follows from invariant 2 so it is the real
+      challenge. If we can define ghost variables and functions to inductively maintain them that imply invariant 2
+      then we are done. 
+
       The most important ghost variables I have defined are parents, visited, unvisited, and the stack.
       The stack represents the list of unvisited nodes. The parents actually represent the call stack of functions.
-      They are the nodes which represent the function call stack. 
+      They are the nodes which represent the function call stack. The only true real variable is the result array/seq.
 
-      requires parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
-      requires AllAncestors(parents)
+      invariant parents != [] ==> childOf(stack[ |stack| -1], parents[ |parents| -1])
+      invariant AllAncestors(parents)
+      invariant toSet(result) == visited
       invariant AllDisjoint(stack)
       invariant unvisited == TreeUnion(stack)
       invariant unvisited !! visited
       invariant unvisited + visited == root.repr
 
+      The easiest properties to prove were AllDisjoint(stack). Essentially, all nodes currently on the stack and 
+      their entire subtree have not been visited. The result array is the same set of nodes that have been visited.
+      Therefore the unvisited and visited sets are disjoint and they always should sum to the original root repr or 
+      node set. TreeUnion() basically collects all the repr/node sets of all the nodes in the stack and sums them together.
+      That set should be the same as the unvisited set.
+
       There were a couple of choices about how to define the parents array. 
       I believe that pruneParents() will be the right function to represents the functional call stack. 
-      pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]})
+      parents' := pruneParents(parents+parentStack(stack[|stack|-1]), visited+{stack[|stack|-1]})
 
+      The function parentStack will add the current node to the parent stack unless it does not have child nodes.
+      Trying to verify this lead to another required property allLeftVisited and stackPred2. 
+
+      allLeftVisited implies the stronger property that if we are at a given node then all the parent nodes on the way
+      to the current node have already had their entire left subtree visited. allLeftReprVisited would be this property.
+
+      stackPred2 basically says that for every parent in the parent sequence then only the right child will be on the stack
+      unless that parent happens to be the very last node which was visited which put both it's left and right child on the
+      if it had them. It would have been nice to use Seq.FlatMap but it seems to not be available in Dafny 4.6 despite being
+      listed in the library.
+
+      The tricky thing then is to prove things about Seq.Flatten(Seq.Map(visitmap, parents)) since visitMap will sometimes return an empty array.
+      Basically proving that the stack equals Seq.Flatten(Seq.Map(visitmap, parents)) (seems easier)
+      or the reverse the Seq.Flatten(Seq.Map(visitmap, parents)) != [] implies parents != [] (seems harder so far)
+
+      I think this is an important property but I am uncertain if it gets us all the way there because it doesn't say anything about the relationship to
+      i or the index of the parent to the current stack directly. To that end I started defining the parentIndices ghost variable to keep track of the parent's index in the result array.
+      I have not defined a function to update it properly yet or to describe it's properties so far.
+
+
+      // invariant |parents| == |parentIndices|
+      // invariant forall k :: 0 <= k < |parentIndices| ==> result[parentIndices[k]] == parents[k]
+
+      But essentially if the current node is being visited then the parent of the curent node will have position i-1 or
+      we have just finshed off an entire left subtree and we have now went back up the subtree to some right node.
+      Possibly at this point we can invoke the lemma PreorderTraversalSlices(). The current last parent should be the 
+      parent of the currently visited right node. I think another property may need defined and proved that the last stack node
+      is the deepest most unvisited node on the stack and it always will match up with the last parent node.
      */
     
     method {:verify false} {:vcs_split_on_every_assert} Traverse(root: TreeNode) returns (result: seq<TreeNode>)
@@ -1081,15 +1131,15 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
             invariant forall x :: x in stack ==> x.Valid()
             /*verifies */
             invariant forall x :: x in stack ==> x in root.repr
-            /*verifies */
+            /*verifies, might be redundant */
             invariant forall x :: x in visited ==> x in root.repr
             /*verifies */
             invariant unvisited !! visited
             /*verifies */
             invariant unvisited + visited == root.repr
-            /*verifies */
+            /*verifies, might be redundant */
             invariant visited <= root.repr
-            /*verifies */
+            /*verifies, might be redundant */
             invariant |visited| <= |root.repr|
 
             /*verifies */
