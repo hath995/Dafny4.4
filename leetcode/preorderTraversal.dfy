@@ -1089,6 +1089,19 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
       Possibly at this point we can invoke the lemma PreorderTraversalSlices(). The current last parent should be the 
       parent of the currently visited right node. I think another property may need defined and proved that the last stack node
       is the deepest most unvisited node on the stack and it always will match up with the last parent node.
+
+      Why this might be useful is that when we wind back to a previous parent then we are basically working
+      our way back up the function call stack and now let k be the new last unfinished parent then
+      parent[k].left != null && parent[k].right != null ==> result[parentIndices[k]+1..i+1] == PreorderTraversal(parent[k].left)+PreorderTraversal(parent[k].right) or 
+      parent[k].left != null && parent[k].right == null ==> result[parentIndices[k]+1..i+1] == PreorderTraversal(parent[k].left) or
+      parent[k].left == null && parent[k].right != null ==> result[parentIndices[k]+1..i+1] == PreorderTraversal(parent[k].right) or 
+
+      we can also check if
+      i - parentIndices[k]+1 == parent[k].left.TreeSize() + parent[k].right.TreeSize()
+      i - parentIndices[k]+1 == parent[k].left.TreeSize()
+      i - parentIndices[k]+1 == parent[k].right.TreeSize()
+      respectively 
+      if parentIndices[k] == 0 and i == |root.TreeSize()| then we are done in theory.
      */
     
     method {:verify false} {:vcs_split_on_every_assert} Traverse(root: TreeNode) returns (result: seq<TreeNode>)
