@@ -177,10 +177,61 @@ module InvertBinaryTree {
         }
     }
 
+    lemma subsetsSmaller<T>(a: set<T>, b: set<T>)
+        requires a < b
+        ensures |a| < |b|
+    {
+        if something :| something in a {
+            if a-{something} == {} {
+                var x :| x in b && x != something;
+                subsetsSmaller(a-{something}, b);
+                assert b == {something, x}+(b-{something, x});
+                assert |b| >= 2;
+                // assert |b| == 
+            }else{
+                var x :| x in b && x != something && x !in a;
+                assert b == {something, x}+(b-{something, x});
+                assert |b| >= 2;
 
-    lemma {:verify false} PreorderTraversalSubSlices(root: TreeNode)
+                subsetsSmaller(a-{something}, b-{something});
+            }
+        }else{
+            assert a == {};
+            assert |a| == 0;
+        }
+    } 
+
+    lemma {:vcs_split_on_every_assert} childTraversalSize(root: TreeNode, node: TreeNode)
         requires root.Valid()
-        ensures forall node :: node in root.repr ==> exists k,j :: 0<=k<=j< |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j]
+        requires node.Valid()
+        requires node != root
+        requires node in root.repr
+        ensures |PreorderTraversal(node)| < |PreorderTraversal(root)|
+    {
+        traversalSize(root);
+        traversalSize(node);
+        ChildNodesReprAreLess(root, node);
+        assert |PreorderTraversal(node)| == |node.repr|;
+        assert |PreorderTraversal(root)| == |root.repr|;
+        subsetsSmaller(node.repr, root.repr);
+        assert |PreorderTraversal(node)| < |PreorderTraversal(root)|;
+    }
+
+    lemma PreorderTraversalSlices(root: TreeNode)
+      requires root.Valid()
+      // ensures root.left != null && root.right != null ==> PreorderTraversal(root)[]
+      ensures PreorderTraversal(root)[..1] == [root]
+      ensures root.left != null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.left)|+1] == PreorderTraversal(root.left)
+      ensures root.right != null && root.left == null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.right)|+1] == PreorderTraversal(root.right)
+      ensures root.right != null && root.left != null ==> PreorderTraversal(root)[|PreorderTraversal(root.left)|+1..] == PreorderTraversal(root.right)
+    {
+
+    }
+
+    //Still doesn't verify, definitely seems like it should. Is it a trigger problem?
+    lemma {:verify false} {:vcs_split_on_every_assert} PreorderTraversalSubSlices(root: TreeNode)
+        requires root.Valid()
+        ensures forall node :: node in root.repr ==> exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j]
         decreases root.repr
     {
         forall node | node in root.repr 
@@ -188,7 +239,7 @@ module InvertBinaryTree {
         {
             if node == root {
                 assert PreorderTraversal(node) == PreorderTraversal(root)[0..|PreorderTraversal(root)|];
-                assert exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
+                // assert exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
             }else if node == root.left {
                 if root.right == null {
                     assert PreorderTraversal(root) == [root]+PreorderTraversal(root.left);
@@ -197,25 +248,88 @@ module InvertBinaryTree {
                     assert PreorderTraversal(root) == [root]+PreorderTraversal(root.left)+PreorderTraversal(root.right);
                     assert |PreorderTraversal(root.left)| < |PreorderTraversal(root)|;
                     assert PreorderTraversal(node) == PreorderTraversal(root)[1..|PreorderTraversal(node)|+1];
+                    childTraversalSize(root, node);
+                    assert 0 <= 1 <= |PreorderTraversal(node)|+1 <= |PreorderTraversal(root)|;
                 }
-                assert exists k,j :: 0<=k<=j< |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
+                // assert exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
             }else if node == root.right {
                 if root.left == null {
                     assert PreorderTraversal(root) == [root]+PreorderTraversal(root.right);
                     assert PreorderTraversal(node) == PreorderTraversal(root)[1..|PreorderTraversal(root)|];
                 }else{
                     assert PreorderTraversal(root) == [root]+PreorderTraversal(root.left)+PreorderTraversal(root.right);
-                    assert |PreorderTraversal(root.left)| < |PreorderTraversal(root)|;
-                    assert |PreorderTraversal(root.right)| < |PreorderTraversal(root)|;
+                    childTraversalSize(root, node);
+                    childTraversalSize(root, root.left);
+                    // assert |PreorderTraversal(root.left)| < |PreorderTraversal(root)|;
+                    // assert |PreorderTraversal(root.right)| < |PreorderTraversal(root)|;
                     assert PreorderTraversal(node) == PreorderTraversal(root)[(1+|PreorderTraversal(root.left)|)..|PreorderTraversal(root)|];
+                    assert 0 <= 1+|PreorderTraversal(root.left)| <= |PreorderTraversal(root)|;
                 }
-                // assert exists k,j :: 0<=k<=j< |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
-            }else{
+                // assert exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
+            }else if node != root && node != root.right && node != root.left {
+                childInRootRepr(root, node);
+                if root.right == null && root.left == null {
+                    assert false;
+                } else if root.right != null && root.left == null {
+                    assert node in root.right.repr;
+                    PreorderTraversalSubSlices(root);
+                    PreorderTraversalSlices(root.right);
+                    childTraversalSize(root, root.right);
+                    childTraversalSize(root, node);
+                    childTraversalSize(root.right, node);
+                    assert node in PreorderTraversal(root.right);
+                    var x,y :| 0 <= x <= y < |PreorderTraversal(root.right)| && PreorderTraversal(node) == PreorderTraversal(root.right)[x..y];
+                    assert PreorderTraversal(root)[1..|PreorderTraversal(root.right)|+1] == PreorderTraversal(root.right);
+                    assert PreorderTraversal(root)[1+x..1+y] == PreorderTraversal(node);
+                    assert 0 <= 1+x <= 1+y <= |PreorderTraversal(root)|;
+                } else if root.right == null && root.left != null {
+                    assert node in root.left.repr;
+                    PreorderTraversalSubSlices(root);
+                    PreorderTraversalSlices(root.left);
 
-                // assert exists k,j :: 0<=k<=j< |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
+                    childTraversalSize(root, root.left);
+                    childTraversalSize(root, node);
+                    childTraversalSize(root.left, node);
+                    assert node in PreorderTraversal(root.left);
+                    var x,y :| 0 <= x <= y < |PreorderTraversal(root.left)| && PreorderTraversal(node) == PreorderTraversal(root.left)[x..y];
+                    assert PreorderTraversal(root)[1..|PreorderTraversal(root.left)|+1] == PreorderTraversal(root.left);
+                    assert PreorderTraversal(root)[1+x..1+y] == PreorderTraversal(node);
+                    assert 0 <= 1+x <= 1+y <= |PreorderTraversal(root)|;
+                }else if root.right != null && root.right != null {
+                    if node in root.right.repr {
+                    PreorderTraversalSlices(root);
+                    PreorderTraversalSubSlices(root.right);
+                    childTraversalSize(root, root.right);
+                    childTraversalSize(root, node);
+                    childTraversalSize(root.right, node);
+                    assert node in PreorderTraversal(root.right);
+
+                    var x,y :| 0 <= x <= y < |PreorderTraversal(root.right)| && PreorderTraversal(node) == PreorderTraversal(root.right)[x..y];
+                    assert PreorderTraversal(root)[|PreorderTraversal(root.left)|+1..] == PreorderTraversal(root.right);
+                    assert PreorderTraversal(root)[|PreorderTraversal(root.left)|+x..|PreorderTraversal(root.left)|+y] == PreorderTraversal(node);
+                    assert 0 <= |PreorderTraversal(root.left)|+x <= |PreorderTraversal(root.left)|+y <= |PreorderTraversal(root)|;
+                    }else if node in root.left.repr {
+                    PreorderTraversalSlices(root);
+                    PreorderTraversalSubSlices(root.left);
+                    childTraversalSize(root, root.left);
+                    childTraversalSize(root, node);
+                    childTraversalSize(root.left, node);
+                    assert node in PreorderTraversal(root.left);
+                    var x,y :| 0 <= x <= y < |PreorderTraversal(root.left)| && PreorderTraversal(node) == PreorderTraversal(root.left)[x..y];
+                    assert PreorderTraversal(root)[1..|PreorderTraversal(root.left)|+1] == PreorderTraversal(root.left);
+                    assert PreorderTraversal(root)[1+x..1+y] == PreorderTraversal(node);
+                    assert 0 <= 1+x <= 1+y <= |PreorderTraversal(root)|;
+
+                    }
+                }
+                assert exists k,j :: 0<=k<=j <= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
+            }else{
+                assert false;
             }
+            // assert node != root && node != root.right && node != root.left;
+                assert exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
         }
-        assert forall node :: node in root.repr ==> exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
+        // assert forall node :: node in root.repr ==> exists k,j :: 0<=k<=j<= |PreorderTraversal(root)| && PreorderTraversal(node) == PreorderTraversal(root)[k..j];
     }
 
     lemma PreorderTraversalEqualToRepr(root: TreeNode)
@@ -517,6 +631,37 @@ module InvertBinaryTree {
             assert false;
         }
     }
+
+    lemma ChildNodesReprAreLess(root: TreeNode, child: TreeNode)
+        requires root.Valid()
+        requires child in root.repr
+        requires child != root
+        decreases root.repr
+        ensures child.repr < root.repr
+        ensures child.Valid()
+    {
+        if child == root.left {
+
+        }else if child == root.right {
+
+        }else if root.left != null && root.right != null {
+            assert root.repr == {root} + root.left.repr + root.right.repr;
+            if child in root.left.repr {
+                ChildNodesReprAreLess(root.left, child);
+            }else if child in root.right.repr {
+                ChildNodesReprAreLess(root.right, child);
+            }else{
+                assert false;
+            }
+        }else if root.right != null {
+
+        }else if root.left != null {
+
+        }else{
+            assert false;
+        }
+    }
+
 
     twostate lemma ValidSwappingStillValid(root: TreeNode, child: TreeNode)
         requires root.Valid()

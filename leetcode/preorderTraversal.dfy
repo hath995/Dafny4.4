@@ -409,16 +409,7 @@ lemma ThereIsAMinimum(s: set<TreeNode>)
         forall x, y :: 0 <= x < y < |ts| && x != y ==> ts[x].repr !! ts[y].repr
     }
 
-    lemma PreorderTraversalSlices(root: TreeNode)
-      requires root.Valid()
-      // ensures root.left != null && root.right != null ==> PreorderTraversal(root)[]
-      ensures PreorderTraversal(root)[..1] == [root]
-      ensures root.left != null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.left)|+1] == PreorderTraversal(root.left)
-      ensures root.right != null && root.left == null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.right)|+1] == PreorderTraversal(root.right)
-      ensures root.right != null && root.left != null ==> PreorderTraversal(root)[|PreorderTraversal(root.left)|+1..] == PreorderTraversal(root.right)
-    {
-
-    }
+  
 
     lemma  AllDisjointMaint(stack: seq<TreeNode>, current: TreeNode)
         requires |stack| > 0
