@@ -524,6 +524,8 @@ module PreorderTraversal {
             } else if stack == allRightPlusChildren(parents, visited) {
               allRightPlusChildrenLemma(parents, visited);
               var somex :| somex in stack[..|stack|-1];
+              assert somex in allRightPlusChildren(parents, visited);
+              var parentofx :| 0 <= parentofx < |parents| && somex in children(parents[parentofx]);
               assert somex in visited;
               assert false;
             }
