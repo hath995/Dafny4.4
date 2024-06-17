@@ -120,22 +120,6 @@ module InvertBinaryTree {
       
     }
 
-    // function TreeSize(root: TreeNode?): nat 
-    //     reads if root == null then {} else {root} + root.repr
-    //     requires root != null ==> root.Valid()
-    //     decreases if root == null then {} else root.repr
-    // {
-    //     if root == null then 0 
-    //     else if root.left != null && root.right != null then
-    //         1 + TreeSize(root.left) + TreeSize(root.right)
-    //     else if root.left != null && root.right == null then
-    //         1 + TreeSize(root.left)
-    //     else if root.left == null && root.right != null then
-    //         1 + TreeSize(root.right)
-    //     else
-    //         1
-    // }
-
     function PreorderTraversal(root: TreeNode): seq<TreeNode>
         reads root.repr
         requires root.Valid()
@@ -201,7 +185,7 @@ module InvertBinaryTree {
         }
     } 
 
-    lemma {:vcs_split_on_every_assert} childTraversalSize(root: TreeNode, node: TreeNode)
+    lemma childTraversalSize(root: TreeNode, node: TreeNode)
         requires root.Valid()
         requires node.Valid()
         requires node != root
@@ -224,9 +208,7 @@ module InvertBinaryTree {
       ensures root.left != null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.left)|+1] == PreorderTraversal(root.left)
       ensures root.right != null && root.left == null ==> PreorderTraversal(root)[1..|PreorderTraversal(root.right)|+1] == PreorderTraversal(root.right)
       ensures root.right != null && root.left != null ==> PreorderTraversal(root)[|PreorderTraversal(root.left)|+1..] == PreorderTraversal(root.right)
-    {
-
-    }
+    {}
 
     //Still doesn't verify, definitely seems like it should. Is it a trigger problem?
     lemma {:verify false} {:vcs_split_on_every_assert} PreorderTraversalSubSlices(root: TreeNode)
