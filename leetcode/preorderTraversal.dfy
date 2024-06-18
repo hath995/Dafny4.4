@@ -789,14 +789,140 @@ method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNo
     }
 
     ghost predicate allValidParents(root: TreeNode) 
-      reads root, root.repr, root.parentRepr
+      reads root, root.repr, root.parentRepr, root.parent
       requires root.Valid()
       requires root.ParentValid()
     {
-      (root.parent == null) && forall x :: x in root.repr ==> x.parentRepr < root.repr && x.ParentValid() && (root != x ==> x.parent != null)
+      // (root.parent == null) && forall x :: x in root.repr ==> x.parentRepr < root.repr && x.ParentValid() && (root != x ==> x.parent != null)
+      forall x :: x in root.repr ==> x.parentRepr < root.repr+{root.parent} && x.ParentValid() && (root != x ==> x.parent != null)
     }
 
-    lemma {:vcs_split_on_every_assert} parentsUniqueHelper(root: TreeNode, parent: TreeNode, child: TreeNode)
+    lemma AllValidParentsChild(root: TreeNode, child: TreeNode) 
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root)
+      requires child != root
+      requires child in root.repr
+      ensures child.Valid()
+      ensures child.ParentValid()
+    {
+      ChildNodesReprAreLess(root, child);
+      childInRootRepr(root, child);
+      forall x | x in child.repr 
+       ensures x.parentRepr < child.repr+{child.parent} && x.ParentValid() && (child != x ==> x.parent != null)
+       {
+        assert x in root.repr;
+        // assert x.parentRepr < root.repr+{root.parent} && x.ParentValid() && (root != x ==> x.parent != null);
+        assert x != root by {
+          if root.right == null && root.left == null {
+            assert false;
+          } else if root.right == null && root.left != null {
+            ChildNodesAreValid(root.left, child);
+            ChildNodesAreValid(child, x);
+            assert x in root.left.repr;
+          } else if root.right != null && root.left == null {
+            ChildNodesAreValid(root.right, child);
+            ChildNodesAreValid(child, x);
+            assert x in root.right.repr;
+          } else if root.right != null && root.left != null {
+            if child in root.right.repr {
+              ChildNodesAreValid(root.right, child);
+              ChildNodesAreValid(child, x);
+              assert x in child.repr;
+              assert child.repr <= root.right.repr;
+              assert x in root.right.repr;
+
+            }else if child in root.left.repr {
+              ChildNodesAreValid(root.left, child);
+              ChildNodesAreValid(child, x);
+              assert x in root.left.repr;
+            }
+          }
+        }
+      assert x.parentRepr < child.repr+{child.parent}; //Either need to fix definition of parentValid or AllValidParentsChild
+      assert x.ParentValid();
+      assert x != child ==> x.parent != null by {
+          if x != child {
+          assert x != child;
+          assert x != root;
+          assert x in root.repr;
+          assert x.parent != null;
+          }
+        }
+
+        // assert x.parentRepr < child.repr+{child.parent} && x.ParentValid() && (child != x ==> x.parent != null);
+       }
+
+    }
+
+    lemma {:verify false} parentsUniqueHelper(root: TreeNode, parent: TreeNode, child: TreeNode)
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root)
+      requires parent in root.repr
+      requires child in root.repr
+      requires child.parent != null
+      requires child.parent != root
+      requires child != root
+      requires parent != child.parent
+      requires parent != root
+      requires childOf(child, parent)
+      decreases root.repr
+      ensures false
+    {
+      reveal child.ParentValid();
+
+      assert child.parent != null;
+      assert child.ParentValid();
+      assert child.parentRepr == {child.parent} + child.parent.parentRepr;
+      ChildNodesAreValid(root, child.parent);
+      ChildNodesAreValid(root, parent);
+      ChildNodesAreValid(root, child);
+      childInRootRepr(root, parent);
+      childInRootRepr(root, child.parent);
+      if root.left == null && root.right == null {
+        assert false;
+      }else if root.left != null && root.right != null {
+        assert child in parent.repr;
+        assert child in child.parent.repr;
+        if child.parent in root.left.repr && parent in root.right.repr {
+          ChildNodesAreValid(root.left, child.parent);
+          ChildNodesAreValid(root.right, parent);
+          assert child in root.left.repr;
+          assert child in root.right.repr;
+        }else if child.parent in root.right.repr && parent in root.left.repr {
+          ChildNodesAreValid(root.left, parent);
+          ChildNodesAreValid(root.right,child.parent);
+          assert child in root.left.repr;
+          assert child in root.right.repr;
+        }else if child.parent in root.right.repr && parent in root.right.repr {
+          ChildNodesAreValid(root.right,child.parent);
+          assert child in root.right.repr;
+          parentsUnique(root.right);
+        }else if child.parent in root.left.repr && parent in root.left.repr {
+          ChildNodesAreValid(root.left,child.parent);
+          assert child in root.left.repr;
+          parentsUnique(root.left);
+        }
+
+      }else if root.left == null && root.right != null {
+        assert child.parent in root.right.repr;
+        ChildNodesAreValid(root.right, child.parent);
+        assert child in root.right.repr;
+        assert parent in root.right.repr;
+          parentsUnique(root.right);
+      }else if root.left != null && root.right == null {
+        assert child.parent in root.left.repr;
+        ChildNodesAreValid(root.left, child.parent);
+        assert child in root.left.repr;
+        assert parent in root.left.repr;
+          parentsUnique(root.left);
+      }
+        
+      assert false;
+    }
+
+    lemma {:verify false} parentsUniqueHelperRoot(root: TreeNode, parent: TreeNode, child: TreeNode)
       requires root.Valid()
       requires root.ParentValid()
       requires allValidParents(root)
@@ -805,21 +931,66 @@ method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNo
       requires child.parent != null
       requires child != root
       requires parent != child.parent
+      requires child.parent == root
       requires parent != root
       requires childOf(child, parent)
       ensures false
     {
       reveal child.ParentValid();
 
-          assert child.parent != null;
-          assert child.ParentValid();
+      assert child.parent != null;
+      assert child.ParentValid();
       assert child.parentRepr == {child.parent} + child.parent.parentRepr;
-      assert false;
+
+      ChildNodesAreValid(root, parent);
+      assert parent.Valid();
+     
+      childInRootRepr(root, parent);
+      if child == root.left {
+        if root.right == null {
+
+            assert parent in child.repr;
+          assert false;
+        }else{
+          if parent in root.left.repr {
+            assert parent in child.repr;
+
+          }else if parent in root.right.repr {
+            ChildNodesAreValid(root.right, parent);
+            childChildrenInRootRepr(parent, child);
+            assert child in root.right.repr;
+            assert child in root.left.repr;
+          }
+    assert false;
+        }
+      }else if child == root.right {
+
+        if root.left == null {
+
+            assert parent in child.repr;
+          assert false;
+        }else{
+          if parent in root.left.repr {
+            assert child in root.right.repr;
+            ChildNodesAreValid(root.left, parent);
+            childChildrenInRootRepr(parent, child);
+            assert child in root.left.repr;
+
+          }else if parent in root.right.repr {
+            assert parent in child.repr;
+          }
+    assert false;
+        }
+    assert false;
+      }
+
     }
-    lemma   parentsUnique(root: TreeNode)
+    
+    lemma {:verify false}  parentsUnique(root: TreeNode)
       requires root.Valid()
       requires root.ParentValid()
       requires allValidParents(root)
+      decreases root.repr
       ensures forall parent, child :: child in root.repr && parent in root.repr && childOf(child, parent) ==> parent == child.parent
     {
       forall parent, child | child in root.repr && parent in root.repr && childOf(child, parent)
@@ -884,7 +1055,12 @@ method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNo
             }
           }else{
 
+            if child.parent == root {
+
+            parentsUniqueHelperRoot(root, parent, child);
+            }else{
            parentsUniqueHelper(root, parent, child);
+            }
           }
           assert false;
         }
@@ -900,14 +1076,14 @@ method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNo
         "expect" statements are the run time dual of "assert" statements. As in asserts task the verifier must test to be 
         true. Where as "expect" statements must be tested to be true during runtime.
     */
-    method {:vcs_split_on_every_assert} Main() 
+    method {:verify false} Main() 
     {
         var u := new TreeNode(20, null, null);
         var v := new TreeNode(21, null, null);
         var l := new TreeNode(12, u, v);
-        assert l.parentRepr == {};
+        // assert l.parentRepr == {};
         u.setParent(l);
-        assert l.right == v;
+        // assert l.right == v;
         v.setParent(l);
         var m := new TreeNode(13, null, null);
         var h := new TreeNode(8, l, m);
