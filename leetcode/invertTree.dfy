@@ -83,15 +83,17 @@ module InvertBinaryTree {
             decreases parentRepr
         {
             (this !in this.parentRepr) &&
-            ((this.parent == null ==> this.parentRepr == {}) ||
-            (
-                (this.parent != null && 
+            ((this.parent == null ==> this.parentRepr == {}) &&
+                (this.parent != null ==>
                 this.parent in this.parentRepr &&
                 this != parent && 
                 this.parentRepr == {this.parent}+this.parent.parentRepr && 
-                this.parent !in this.parent.parentRepr
-                ) && (this.parent.left == this || this.parent.right == this) && 
-            this.parent.ParentValid()))
+                this.parent !in this.parent.parentRepr && 
+                this.parent !in this.repr && 
+                this.parent.ParentValid()
+                && (this.parent.left == this || this.parent.right == this)
+                ) 
+            )
 
         }
 

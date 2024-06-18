@@ -788,6 +788,109 @@ method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNo
         return result;
     }
 
+    ghost predicate allValidParents(root: TreeNode) 
+      reads root, root.repr, root.parentRepr
+      requires root.Valid()
+      requires root.ParentValid()
+    {
+      (root.parent == null) && forall x :: x in root.repr ==> x.parentRepr < root.repr && x.ParentValid() && (root != x ==> x.parent != null)
+    }
+
+    lemma {:vcs_split_on_every_assert} parentsUniqueHelper(root: TreeNode, parent: TreeNode, child: TreeNode)
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root)
+      requires parent in root.repr
+      requires child in root.repr
+      requires child.parent != null
+      requires child != root
+      requires parent != child.parent
+      requires parent != root
+      requires childOf(child, parent)
+      ensures false
+    {
+      reveal child.ParentValid();
+
+          assert child.parent != null;
+          assert child.ParentValid();
+      assert child.parentRepr == {child.parent} + child.parent.parentRepr;
+      assert false;
+    }
+    lemma   parentsUnique(root: TreeNode)
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root)
+      ensures forall parent, child :: child in root.repr && parent in root.repr && childOf(child, parent) ==> parent == child.parent
+    {
+      forall parent, child | child in root.repr && parent in root.repr && childOf(child, parent)
+        ensures parent == child.parent
+      {
+        ChildNodesAreValid(root, parent);
+        reveal child.ParentValid();
+        assert child != root;
+        if parent != child.parent {
+          // ChildNodesAreValid(root, parent);
+          // ChildNodesAreValid(root, child);
+          assert child in root.repr;
+          assert child.parent != null;
+          assert child.ParentValid();
+          assert child.parentRepr == {child.parent} + child.parent.parentRepr;
+          assert child.parent in child.parentRepr;
+          assert child.parent in root.repr;
+          assert childOf(child, child.parent);
+          ChildNodesAreValid(root, child.parent);
+          assert child.parent.Valid();
+          assert child in child.parent.repr;
+          assert child in parent.repr;
+          if parent == root {
+            // ChildNodesReprAreLess(root, child.parent);
+            childInRootRepr(root, child.parent);
+            if child == root.left {
+              if root.right == null {
+
+                  assert child.parent in child.repr;
+                assert false;
+              }else{
+                if child.parent in root.left.repr {
+                  assert child.parent in child.repr;
+
+                }else if child.parent in root.right.repr {
+                  ChildNodesAreValid(root.right, child.parent);
+                  childChildrenInRootRepr(child.parent, child);
+                  assert child in root.right.repr;
+                  assert child in root.left.repr;
+                }
+          assert false;
+              }
+            }else if child == root.right {
+
+              if root.left == null {
+
+                  assert child.parent in child.repr;
+                assert false;
+              }else{
+                if child.parent in root.left.repr {
+                  assert child in root.right.repr;
+                  ChildNodesAreValid(root.left, child.parent);
+                  childChildrenInRootRepr(child.parent, child);
+                  assert child in root.left.repr;
+
+                }else if child.parent in root.right.repr {
+                  assert child.parent in child.repr;
+                }
+          assert false;
+              }
+          assert false;
+            }
+          }else{
+
+           parentsUniqueHelper(root, parent, child);
+          }
+          assert false;
+        }
+      }
+    }
+
 
     /*
         By hitting F5 Dafny will attempt to run code in a Main method. You will need to add --standard-libraries to
