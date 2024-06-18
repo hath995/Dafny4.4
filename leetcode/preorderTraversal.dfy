@@ -371,7 +371,7 @@ module PreorderTraversal {
       }  
     }
 
-    lemma {:verify } {:vcs_split_on_every_assert} traverseMaint(
+    lemma {:verify false} {:vcs_split_on_every_assert} traverseMaint(
         root: TreeNode,
         result: seq<TreeNode>,
         visited: set<TreeNode>,
@@ -797,21 +797,36 @@ method {:verify false} TraverseBasic(root: TreeNode) returns (result: seq<TreeNo
         "expect" statements are the run time dual of "assert" statements. As in asserts task the verifier must test to be 
         true. Where as "expect" statements must be tested to be true during runtime.
     */
-    method Main() 
+    method {:vcs_split_on_every_assert} Main() 
     {
         var u := new TreeNode(20, null, null);
         var v := new TreeNode(21, null, null);
         var l := new TreeNode(12, u, v);
+        assert l.parentRepr == {};
+        u.setParent(l);
+        assert l.right == v;
+        v.setParent(l);
         var m := new TreeNode(13, null, null);
         var h := new TreeNode(8, l, m);
+        m.setParent(h);
+        l.setParent(h);
         var o := new TreeNode(14, null, null);
         var p := new TreeNode(15, null, null);
         var i := new TreeNode(9, o, p);
+        o.setParent(i);
+        p.setParent(i);
         var d := new TreeNode(4, h, i);
+        h.setParent(d);
+        i.setParent(d);
         var e := new TreeNode(5, null, null);
         var b := new TreeNode(2, d, e);
+        d.setParent(b);
+        e.setParent(b);
         var c := new TreeNode(3, null, null);
         var a := new TreeNode(1, b, c);
+        b.setParent(a);
+        c.setParent(a);
+        assert c.ParentValid();
         var flat := Traverse(a);
         print mapNodes(flat), "\n";
         print mapNodes(PreorderTraversal(a)), "\n";

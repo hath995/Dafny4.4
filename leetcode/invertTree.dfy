@@ -29,6 +29,8 @@ module InvertBinaryTree {
         var left: TreeNode?
         var right: TreeNode?
         var repr: set<TreeNode>
+        var parent: TreeNode?
+        var parentRepr: set<TreeNode>
 
         constructor(val: int, left: TreeNode?, right: TreeNode?)
             requires left != null ==> left.Valid()
@@ -40,6 +42,8 @@ module InvertBinaryTree {
             ensures left != null ==> this !in left.repr
             ensures right != null ==> this !in right.repr
             ensures Valid()
+            ensures ParentValid()
+            ensures parentRepr == {}
         {
             this.val := val;
             this.left := left;
@@ -47,6 +51,9 @@ module InvertBinaryTree {
             var leftRepr := if left != null then {left}+left.repr else {};
             var rightRepr := if right != null then {right}+right.repr else {};
             this.repr := {this} + leftRepr + rightRepr;
+            this.parent := null;
+            this.parentRepr := {};
+            reveal ParentValid();
         }
 
         ghost predicate Valid()
@@ -69,6 +76,49 @@ module InvertBinaryTree {
             && (this.left != null && this.right == null ==> this.repr == {this} + this.left.repr)
             && (this.right != null && this.left == null ==> this.repr == {this} + this.right.repr)
             && (this.right == null && this.left == null ==> this.repr == {this})
+        }
+
+        opaque ghost predicate ParentValid() 
+            reads this, parentRepr
+            decreases parentRepr
+        {
+            (this !in this.parentRepr) &&
+            ((this.parent == null ==> this.parentRepr == {}) ||
+            (
+                (this.parent != null && 
+                this.parent in this.parentRepr &&
+                this != parent && 
+                this.parentRepr == {this.parent}+this.parent.parentRepr && 
+                this.parent !in this.parent.parentRepr
+                ) && (this.parent.left == this || this.parent.right == this) && 
+            this.parent.ParentValid()))
+
+        }
+
+        method setParent(parent: TreeNode)
+            requires parent.ParentValid()
+            requires parent.Valid()
+            requires this == parent.left || this == parent.right
+            requires this != parent
+            requires this !in parent.parentRepr
+            requires parent.left != null ==> allocated(parent.left)
+            requires parent.right != null ==> allocated(parent.right)
+            requires this.Valid()
+            modifies this, parent
+            ensures parent.ParentValid()
+            ensures this.ParentValid()
+            // ensures parent.left != null ==> unchanged(parent.left)
+            // ensures parent.right != null ==> unchanged(parent.right)
+            ensures old(parent.left) == parent.left
+            ensures old(parent.right) == parent.right
+            ensures old(parent.parentRepr) == parent.parentRepr
+            ensures old(repr) == repr
+            ensures parent.Valid()
+            ensures this.Valid()
+        {
+            this.parent := parent;
+            this.parentRepr := {parent}+parent.parentRepr;
+            reveal ParentValid();
         }
 
         ghost predicate iterativeValid()
