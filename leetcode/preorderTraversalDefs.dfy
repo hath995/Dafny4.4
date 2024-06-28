@@ -186,6 +186,16 @@ module PreorderTraversalSupp {
       var visitMap := (x: TreeNode) reads x => rightStackUnvisited(x, visited);
       Seq.Flatten(Seq.Map(visitMap, parents[..|parents|-1]))+childStack(parents[|parents|-1])
     }
+
+    ghost predicate allValidParents(root: TreeNode, node: TreeNode) 
+      reads root, root.repr, root.parentRepr, root.parent, node, node.repr, node.parentRepr, node.parent
+      requires root.Valid()
+      requires root.ParentValid()
+      requires node.Valid()
+      requires node.ParentValid()
+    {
+      forall x :: x in node.repr ==> x.parentRepr <= root.repr-x.repr && x.ParentValid() && (root != x ==> x.parent != null)
+    }
     //Lemmas
 
     lemma childrenLemma(node: TreeNode)
@@ -397,6 +407,338 @@ module PreorderTraversalSupp {
         }else{
           assert x in childStack(parents[|parents|-1]);
           assert x in children(parents[|parents|-1]);
+        }
+      }
+    }
+
+    lemma AllValidParentsChild(root: TreeNode, child: TreeNode) 
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root, root)
+      requires child != root
+      requires child in root.repr
+      ensures child.Valid()
+      ensures child.ParentValid()
+    {
+      ChildNodesReprAreLess(root, child);
+      childInRootRepr(root, child);
+    }
+
+    lemma   parentsUniqueHelper(root: TreeNode, someNode: TreeNode,  parent: TreeNode, child: TreeNode)
+      requires root.Valid()
+      requires root.ParentValid()
+      requires someNode in root.repr
+      requires someNode != root
+      requires someNode.Valid()
+      requires someNode.ParentValid()
+      requires allValidParents(root, someNode)
+      requires parent in root.repr
+      requires child in root.repr
+      requires parent in someNode.repr
+      requires child in someNode.repr
+      requires child.parent != null
+      requires child.parent != root
+      requires child.parent in root.repr
+      requires child.parent in someNode.repr
+      requires child != root
+      requires parent != child.parent
+      requires parent != root
+      requires childOf(child, parent)
+      decreases someNode.repr
+      ensures false
+    {
+      reveal child.ParentValid();
+
+      assert child.parent != null;
+      assert child.ParentValid();
+      assert child.parentRepr == {child.parent} + child.parent.parentRepr;
+      ChildNodesAreValid(root, child.parent);
+      ChildNodesAreValid(root, parent);
+      ChildNodesAreValid(root, child);
+        if parent != someNode && child.parent != someNode {
+          childInRootRepr(someNode, parent);
+          ChildNodesAreValid(root, someNode);
+          if someNode.left != null && someNode.right != null {
+            if child.parent in someNode.left.repr && parent in someNode.right.repr {
+              ChildNodesAreValid(parent, child);
+              ChildNodesAreValid(child.parent, child);
+              ChildNodesAreValid(someNode.left, child.parent);
+              ChildNodesAreValid(someNode.right, parent);
+              assert child in someNode.left.repr && child in someNode.right.repr;
+              assert false;
+            } else if child.parent in someNode.right.repr && parent in someNode.left.repr {
+              ChildNodesAreValid(parent, child);
+              ChildNodesAreValid(child.parent, child);
+              ChildNodesAreValid(someNode.left, parent);
+              ChildNodesAreValid(someNode.right, child.parent);
+              assert child in someNode.left.repr && child in someNode.right.repr;
+              assert false;
+            } else if child.parent in someNode.right.repr && parent in someNode.right.repr {
+              ChildNodesAreValid(parent, child);
+              ChildNodesAreValid(someNode.right, child.parent);
+              parentsUniqueHelper(root, someNode.right, parent, child);
+              assert false;
+            } else if child.parent in someNode.left.repr && parent in someNode.left.repr {
+              ChildNodesAreValid(parent, child);
+              ChildNodesAreValid(someNode.left, parent);
+              parentsUniqueHelper(root, someNode.left, parent, child);
+              assert false;
+            }else{
+              assert false;
+            }
+          } else if someNode.left == null && someNode.right != null {
+              parentsUniqueHelper(root, someNode.right, parent, child);
+              assert false;
+          } else if someNode.left != null && someNode.right == null {
+              parentsUniqueHelper(root, someNode.left, parent, child);
+              assert false;
+          }else{
+            assert false;
+          }
+
+        }else if parent != someNode && child.parent == someNode {
+          childInRootRepr(someNode, parent);
+          if child.parent.left != null && child.parent.right != null {
+            if child.parent.right == child && parent in child.parent.left.repr {
+              ChildNodesAreValid(child.parent.left, parent);
+              ChildNodesAreValid(parent, child);
+              assert child in someNode.left.repr && child in someNode.right.repr;
+              assert false;
+            } else if child.parent.right == child && parent in child.parent.right.repr {
+              assert false;
+            } else if child.parent.left == child && parent in child.parent.right.repr {
+              ChildNodesAreValid(child.parent.right, parent);
+              ChildNodesAreValid(parent, child);
+              assert child in someNode.left.repr && child in someNode.right.repr;
+              assert false;
+            } else if child.parent.left == child && parent in child.parent.left.repr {
+              assert false;
+            }else{
+              assert false;
+            }
+
+          } else if child.parent.left == null && child.parent.right != null {
+            assert child.parent.right == child;
+            assert false;
+
+          }else if child.parent.left != null && child.parent.right == null {
+            assert child.parent.left == child;
+            assert false;
+          }else{
+            assert false;
+          }
+        }else if parent == someNode && child.parent != someNode {
+         if parent.left != null && parent.right != null {
+            if parent.right == child && child.parent in parent.left.repr {
+              ChildNodesAreValid(parent.left, child.parent);
+              assert child in someNode.left.repr && child in someNode.right.repr;
+              assert false;
+            } else if parent.right == child && child.parent in parent.right.repr {
+              assert false;
+            } else if parent.left == child && child.parent in parent.right.repr {
+              ChildNodesAreValid(parent.right, child.parent);
+              assert child in someNode.left.repr && child in someNode.right.repr;
+              assert false;
+            } else if parent.left == child && child.parent in parent.left.repr {
+              assert false;
+            }else{
+              assert false;
+            }
+
+          } else if parent.left == null && parent.right != null {
+            assert parent.right == child;
+            assert false;
+
+          }else if parent.left != null && parent.right == null {
+            assert parent.left == child;
+            assert false;
+          }else{
+            assert false;
+          }
+          assert false;
+        }else{
+          assert parent == someNode && child.parent == someNode;
+          assert false;
+        }
+        assert false;
+    }
+
+    lemma  parentsUniqueHelperRoot(root: TreeNode, parent: TreeNode, child: TreeNode)
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root, root)
+      requires parent in root.repr
+      requires child in root.repr
+      requires child.parent != null
+      requires child != root
+      requires parent != child.parent
+      requires child.parent == root
+      requires parent != root
+      requires childOf(child, parent)
+      ensures false
+    {
+      reveal child.ParentValid();
+
+      assert child.parent != null;
+      assert child.ParentValid();
+      assert child.parentRepr == {child.parent} + child.parent.parentRepr;
+
+      ChildNodesAreValid(root, parent);
+      assert parent.Valid();
+     
+      childInRootRepr(root, parent);
+      if child == root.left {
+        if root.right == null {
+
+            assert parent in child.repr;
+          assert false;
+        }else{
+          if parent in root.left.repr {
+            assert parent in child.repr;
+
+          }else if parent in root.right.repr {
+            ChildNodesAreValid(root.right, parent);
+            childChildrenInRootRepr(parent, child);
+            assert child in root.right.repr;
+            assert child in root.left.repr;
+          }
+    assert false;
+        }
+      }else if child == root.right {
+
+        if root.left == null {
+
+            assert parent in child.repr;
+          assert false;
+        }else{
+          if parent in root.left.repr {
+            assert child in root.right.repr;
+            ChildNodesAreValid(root.left, parent);
+            childChildrenInRootRepr(parent, child);
+            assert child in root.left.repr;
+
+          }else if parent in root.right.repr {
+            assert parent in child.repr;
+          }
+    assert false;
+        }
+    assert false;
+      }
+
+    }
+    
+    lemma parentsUnique(root: TreeNode)
+      requires root.Valid()
+      requires root.ParentValid()
+      requires allValidParents(root, root)
+      decreases root.repr
+      ensures forall parent, child :: child in root.repr && parent in root.repr && childOf(child, parent) ==> parent == child.parent
+    {
+      forall parent, child | child in root.repr && parent in root.repr && childOf(child, parent)
+        ensures parent == child.parent
+      {
+        ChildNodesAreValid(root, parent);
+        reveal child.ParentValid();
+        assert child != root;
+        if parent != child.parent {
+          assert child in root.repr;
+          assert child.parent != null;
+          assert child.ParentValid();
+          assert child.parentRepr == {child.parent} + child.parent.parentRepr;
+          assert child.parent in child.parentRepr;
+          assert child.parent in root.repr;
+          assert childOf(child, child.parent);
+          ChildNodesAreValid(root, child.parent);
+          assert child.parent.Valid();
+          assert child in child.parent.repr;
+          assert child in parent.repr;
+          if parent == root {
+            childInRootRepr(root, child.parent);
+            if child == root.left {
+              if root.right == null {
+
+                  assert child.parent in child.repr;
+                assert false;
+              }else{
+                if child.parent in root.left.repr {
+                  assert child.parent in child.repr;
+
+                }else if child.parent in root.right.repr {
+                  ChildNodesAreValid(root.right, child.parent);
+                  childChildrenInRootRepr(child.parent, child);
+                  assert child in root.right.repr;
+                  assert child in root.left.repr;
+                }
+          assert false;
+              }
+            }else if child == root.right {
+
+              if root.left == null {
+
+                  assert child.parent in child.repr;
+                assert false;
+              }else{
+                if child.parent in root.left.repr {
+                  assert child in root.right.repr;
+                  ChildNodesAreValid(root.left, child.parent);
+                  childChildrenInRootRepr(child.parent, child);
+                  assert child in root.left.repr;
+
+                }else if child.parent in root.right.repr {
+                  assert child.parent in child.repr;
+                }
+          assert false;
+              }
+          assert false;
+            }
+          }else{
+
+            if child.parent == root {
+
+            parentsUniqueHelperRoot(root, parent, child);
+            }else{
+              assert parent != root;
+              assert child.parent != root;
+              childInRootRepr(root, parent);
+              childInRootRepr(root, child.parent);
+              if root.left != null && root.right != null {
+                if parent in root.left.repr && child.parent in root.right.repr {
+                  ChildNodesAreValid(root.left, parent);
+                  ChildNodesAreValid(root.right, child.parent);
+                  assert child in root.left.repr && child in root.right.repr;
+                assert false;
+                } else if parent in root.right.repr && child.parent in root.left.repr {
+                  ChildNodesAreValid(root.right, parent);
+                  ChildNodesAreValid(root.left, child.parent);
+                  assert child in root.left.repr && child in root.right.repr;
+                assert false;
+                } else if parent in root.left.repr && child.parent in root.left.repr {
+                  ChildNodesAreValid(root.left, parent);
+                 parentsUniqueHelper(root, root.left, parent, child);
+                assert false;
+                } else if parent in root.right.repr && child.parent in root.right.repr {
+                  ChildNodesAreValid(root.right, parent);
+                 parentsUniqueHelper(root, root.right, parent, child);
+                assert false;
+                }else{
+
+                assert false;
+                }
+                assert false;
+              } else if root.left == null && root.right != null {
+                 parentsUniqueHelper(root, root.right, parent, child);
+                assert false;
+              } else if root.left != null && root.right == null {
+                 parentsUniqueHelper(root, root.left, parent, child);
+                assert false;
+
+              } else {
+                assert false;
+              }
+          //  parentsUniqueHelper(root, root, parent, child);
+            }
+          }
+          assert false;
         }
       }
     }
