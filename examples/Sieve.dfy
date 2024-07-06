@@ -62,6 +62,17 @@ module  Sieve {
             prodSelfAnnihilation(p,q);
         }
     }
+    
+    lemma DivisorIsFactor(d: nat, n: nat)
+        requires d >= 2
+        requires n > 2
+        requires n % d == 0
+        ensures IsFactor(d, n)
+    {
+        var k := n/d;
+        reveal prod();
+        assert prod(d, k) == n;
+    }
 
     ghost function Factors(x: nat): set<nat> 
         requires x > 0
@@ -70,7 +81,7 @@ module  Sieve {
     }
 
     ghost predicate Prime(p: nat) 
-        requires p > 0
+        requires p > 1
     {
         Factors(p) == {1, p}
     }
@@ -81,7 +92,7 @@ module  Sieve {
     }
 
     lemma PrimesEquivalent(k: nat)
-        requires k > 0
+        requires k > 1
         requires is_prime(k)
         ensures Prime(k)
     {
@@ -105,6 +116,29 @@ module  Sieve {
             assert false;
         }
 
+    }
+
+    lemma PrimesEquivalentReverse(k: nat)
+        requires k > 1
+        requires Prime(k)
+        ensures is_prime(k)
+    {
+        reveal is_prime();
+        assert k > 1;
+        assert forall d :: 2 <= d < k ==> k % d != 0 by {
+            forall d | 2 <= d < k
+                ensures k % d != 0
+            {
+                if k % d == 0 {
+                    var n : nat := k / d;
+                    reveal prod();
+                    assert prod(d, n) == k;
+                    assert IsFactor(d, k);
+                    assert d in Factors(k);
+                    assert false;
+                }
+            }
+        }
     }
 
     opaque predicate hasDivisor(k: nat)
@@ -141,8 +175,8 @@ module  Sieve {
         requires 2 <= i < sieve.Length
     {
         (forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)))
-        && (forall k: nat :: 1 <= k < i && sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j))
-        && (forall j:nat :: (i <= j < sieve.Length) && hasNoDivisorLessThan(j, i) ==> sieve[j])
+        && (forall k: nat :: 1 <= k < i  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j))
+        && (forall j:nat :: (i <= j < sieve.Length) ==> hasNoDivisorLessThan(j, i) ==> sieve[j])
     }
     
     predicate allSievedPrimes(sieve: array<bool>) 
@@ -151,7 +185,82 @@ module  Sieve {
         forall k: nat :: 0 <= k < sieve.Length ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))
     }
 
-    lemma SievedToQ(sieve: array<bool>, i: nat, n: nat)
+    lemma factorIsLessThan(a: nat, b: nat, c: nat)
+        requires a > 1
+        requires b > 1
+        // requires c > 1
+        requires prod(a, b) == c
+        ensures a < c
+        ensures b < c
+    {
+        reveal prod();
+    }
+
+    lemma {:vcs_split_on_every_assert} NonPrimeHasFactorLessThanRoot(k: nat, i: nat)
+        requires k > 2
+        requires i < k
+        requires !is_prime(k)
+        requires IsNatSqrt(i, k)
+        ensures exists d :: d in Factors(k) && 2 <= d <= i < k
+    {
+        assert i < k;
+        notPrimeHasDivisor(k);
+        assert hasDivisor(k);
+        reveal hasDivisor();
+        var d :|  2 <= d < k && k % d == 0;
+        DivisorIsFactor(d, k);
+        assert d in Factors(k);
+        assert IsFactor(d, k);
+        // assert !Prime(k);
+        // assert d != 1;
+        assert exists d :: d in Factors(k) && 2 <= d <= i < k by {
+            if !(exists d :: d in Factors(k) && 2 <= d <= i < k) {
+                // assert forall d :: d in Factors(k) ==> d < 2 || d > i;
+                // assert d != 1;
+                // assert d != 0;
+                var nd: nat :| prod(d, nd) == k;
+                assert nd != 0 by {
+                    assert k != 0;
+                    reveal prod();
+                }
+                assert nd != 1 by {
+                    reveal prod();
+                }
+                assert IsFactor(nd, k) by {
+                    reveal prod();
+                    assert d * nd == k;
+                    assert prod(nd, d) == k;
+                    assert nd * d == k;
+                }
+                assert nd in Factors(k) by {
+                    // reveal prod();
+                    factorIsLessThan(d, nd, k);
+                    assert nd < k;
+                }
+                assert nd > i;
+
+                assert prod(d,nd) != k by {
+                    // assert i*i >= k;
+                    // assert nd > i;
+                    // assert d > i;
+                    reveal prod();
+                    var d' := d-i;
+                    var dd' := nd-i;
+                    assert d' > 0;
+                    assert dd' > 0;
+                    calc {
+                        d * nd;
+                        (i+d')*(i+dd');
+                    }
+                }
+                // assert !IsFactor(d, k);
+
+                assert false;   
+            }
+        }
+    }
+
+    lemma {:verify false} SievedToQ(sieve: array<bool>, i: nat, n: nat)
         requires n > 2
         requires n+1 == sieve.Length
         requires 0 <= i < sieve.Length
@@ -160,8 +269,8 @@ module  Sieve {
         ensures allSievedPrimes(sieve)
     {
         assert forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k));
-        assert forall k: nat :: 1 <= k < i && sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j);
-        assert forall j:nat :: (i <= j < sieve.Length) && hasNoDivisorLessThan(j, i) ==> sieve[j];
+        assert forall k: nat :: 1 <= k < i  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j);
+        assert forall j:nat :: (i <= j < sieve.Length)  ==> hasNoDivisorLessThan(j, i) ==> sieve[j];
         assert forall k: nat :: i < k < sieve.Length ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)) by {
             forall k:  nat | i < k < sieve.Length
                 ensures (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))
@@ -171,6 +280,7 @@ module  Sieve {
                     assert hasDivisor(k);
                     assert !is_prime(k);
                 }else{
+                    assert hasNoDivisorLessThan(k, i);
                     assert is_prime(k);
 
                 }
