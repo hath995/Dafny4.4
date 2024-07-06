@@ -203,9 +203,9 @@ module  Sieve {
         requires IsNatSqrt(i, k)
         ensures exists d :: d in Factors(k) && 2 <= d <= i < k
     {
-        assert i < k;
+        // assert i < k;
         notPrimeHasDivisor(k);
-        assert hasDivisor(k);
+        // assert hasDivisor(k);
         reveal hasDivisor();
         var d :|  2 <= d < k && k % d == 0;
         DivisorIsFactor(d, k);

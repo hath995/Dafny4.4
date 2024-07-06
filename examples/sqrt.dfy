@@ -41,6 +41,53 @@ module SOSqrt {
         (n <= 1 && root * root == n) || (n > 1 && (root-1) * (root -1) < n && root * root >= n )
     }
 
+    lemma ThereIsAMax(s: set<nat>)
+    requires s != {}
+    ensures exists x :: x in s && forall y :: y in s ==> x >= y
+    {
+    var x :| x in s;
+    if s == {x} {
+        // obviously, x is the minimum
+    } else {
+        // The minimum in s might be x, or it might be the minimum
+        // in s - {x}. If we knew the minimum of the latter, then
+        // we could compare the two.
+        // Let's start by giving a name to the smaller set:
+        var s' := s - {x};
+        // So, s is the union of s' and {x}:
+        assert s == s' + {x};
+        // The following lemma call establishes that there is a
+        // minimum in s'.
+        ThereIsAMax(s');
+    }
+    }
+
+    lemma  NatSqrtExist(n: nat) 
+        ensures exists root: nat :: IsNatSqrt(root, n)
+    {
+        if n <= 1 {
+            assert IsNatSqrt(n,n);
+        }else{
+            assert n > 1;
+            var setOfLess := set k: nat | 0 < k < n && SumOfNOddNumbers(k) < n; 
+            assert SumOfNOddNumbers(1) == 1;
+            assert 1 in setOfLess;
+            assert setOfLess != {};
+            ThereIsAMax(setOfLess);
+            var r :| r in setOfLess && forall y :: y in setOfLess ==> r >= y;
+            assert SumOfNOddNumbers(r) < n;
+            SumOddIsSquared(r);
+            assert r*r < n;
+            assert (r+1)*(r+1) >= n by {
+                if (r+1)*(r+1) < n {
+                    assert r+1 !in setOfLess;
+                    assert false;
+                }
+            }
+            assert IsNatSqrt(r+1, n);
+        }
+    }
+
     method sqrt(val :nat) returns (root:nat)
         ensures val == 0 ==> root == 0
         ensures val == 1 ==> root == 1
