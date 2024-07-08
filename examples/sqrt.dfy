@@ -88,6 +88,17 @@ module SOSqrt {
         }
     }
 
+    lemma sqrtRelation(s: nat, t: nat, i: nat, j: nat)
+        requires 1 < s < t
+        requires IsNatSqrt(i, s)
+        requires IsNatSqrt(j, t)
+        ensures i <= j
+    {
+        assert s > 1 && (i-1)*(i-1) < s && i*i >= s;
+        assert t > 1 && (j-1)*(j-1) < t && j*j >= t;
+        assert i <= j;
+    }
+
     method sqrt(val :nat) returns (root:nat)
         ensures val == 0 ==> root == 0
         ensures val == 1 ==> root == 1

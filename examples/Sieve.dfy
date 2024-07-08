@@ -176,8 +176,35 @@ module  Sieve {
     {
         (forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)))
         && (forall k: nat :: 1 <= k < i  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j))
-        && (forall j:nat :: (i <= j < sieve.Length) ==> hasNoDivisorLessThan(j, i) ==> sieve[j])
+        // && (forall j:nat :: (i <= j < sieve.Length) ==> hasNoDivisorLessThan(j, i) ==> sieve[j])
+        && (forall j:nat :: (i <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, i)) && (!sieve[j] ==> hasDivisor(j)))
     }
+
+    twostate predicate Preserved(sieve: array<bool>, i: nat) 
+        requires 2 <= i < sieve.Length
+        reads sieve
+    {
+        (i*i < sieve.Length && multiset(old(sieve[..i*i])) == multiset(sieve[..i*i]))
+        || multiset(old(sieve[..])) == multiset(sieve[..])
+    }
+
+    twostate predicate PreservedRest(sieve: array<bool>, i: nat) 
+        requires 2 <= i < sieve.Length
+        reads sieve
+    {
+        i*i < sieve.Length && forall j:nat :: (i * i <= j < sieve.Length) && (j % i != 0) ==> old(sieve[j]) == sieve[j]
+    }
+
+    twostate lemma SievedContinue(sieve: array<bool>, i: nat)
+        requires 2 <=i < sieve.Length-1
+        // requires sievedPrimes(old(sieve), i)
+        requires Preserved(sieve, i)
+        requires PreservedRest(sieve, i)
+        requires sieve[i] ==> forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> !sieve[i]
+        ensures sievedPrimes(sieve, i+1)
+    // {
+
+    // }
     
     predicate allSievedPrimes(sieve: array<bool>) 
         reads sieve
@@ -201,7 +228,7 @@ module  Sieve {
         requires i < k
         requires !is_prime(k)
         requires IsNatSqrt(i, k)
-        ensures exists d :: d in Factors(k) && 2 <= d <= i < k
+        ensures exists d :: d in Factors(k) && 2 <= d <= i
     {
         // assert i < k;
         notPrimeHasDivisor(k);
@@ -259,37 +286,106 @@ module  Sieve {
             }
         }
     }
+    
+    lemma rootPlusOne(k: nat, i: nat)
+        requires 2 <=i
+        requires 2 < k
+        requires IsNatSqrt(i, k)
+        ensures i+1 < k
 
-    lemma {:verify false} SievedToQ(sieve: array<bool>, i: nat, n: nat)
-        requires n > 2
-        requires n+1 == sieve.Length
-        requires 0 <= i < sieve.Length
+    lemma {:vcs_split_on_every_assert} noDivisorsIsPrime(k: nat, n: nat, i: nat)
+        requires 2 <= i+1 < k <= n
         requires IsNatSqrt(i, n)
-        requires sievedPrimes(sieve, i)
-        ensures allSievedPrimes(sieve)
+        requires hasNoDivisorLessThan(k, i+1)
+        ensures is_prime(k)
     {
-        assert forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k));
-        assert forall k: nat :: 1 <= k < i  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j);
-        assert forall j:nat :: (i <= j < sieve.Length)  ==> hasNoDivisorLessThan(j, i) ==> sieve[j];
-        assert forall k: nat :: i < k < sieve.Length ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)) by {
-            forall k:  nat | i < k < sieve.Length
-                ensures (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))
-            {
-
-                if !sieve[k] {
-                    assert hasDivisor(k);
-                    assert !is_prime(k);
-                }else{
-                    assert hasNoDivisorLessThan(k, i);
-                    assert is_prime(k);
-
-                }
+        if k == n {
+            if !is_prime(k) {
+                NonPrimeHasFactorLessThanRoot(k, i);
+                var d :| d in Factors(k) && 2 <= d <= i < k;
+                IsFactorDivides(d, k);
+                reveal hasNoDivisorLessThan();
+                reveal is_prime();
+                assert false;
+            }
+        }else{
+            if !is_prime(k) {
+                NatSqrtExist(k);
+                var kroot: nat :| IsNatSqrt(kroot, k);
+                sqrtRelation(k,n,kroot, i);
+                assert kroot <= i < i+1;
+                NonPrimeHasFactorLessThanRoot(k, kroot);
+                var d :| d in Factors(k) && 2 <= d <= kroot;
+                // assert 2 <= d < i+1 < k by {
+                    // assert i*i >= k;
+                    // rootPlusOne(k, kroot);
+                    // assert kroot <=i < i+1;
+                // }
+                IsFactorDivides(d, k);
+                assert k % d == 0;
+                reveal hasNoDivisorLessThan();
+                assert 2 < i < i+1;
+                assert k % i != 0;
+                // reveal is_prime();
+                assert false;
             }
         }
     }
 
+    lemma {:verify } SievedToQ(sieve: array<bool>, i: nat, n: nat)
+        requires n > 2
+        requires n+1 == sieve.Length
+        requires 0 <= i < sieve.Length
+        requires IsNatSqrt(i, n)
+        requires sievedPrimes(sieve, i+1)
+        ensures allSievedPrimes(sieve)
+    {
+        // assert forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k));
+        // assert forall k: nat :: 1 <= k < i  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j);
+        // assert forall j:nat :: (i <= j < sieve.Length)  ==> sieve[j] ==> hasNoDivisorLessThan(j, i);
+        assert forall k: nat :: i+1 < k < sieve.Length ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)) by {
+            forall k:  nat | i+1 < k < sieve.Length
+                ensures (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))
+            {
 
-    method {:verify false} EratosthenesSieve(n: nat) returns (primes: set<nat>)        
+                if !sieve[k] {
+                    assert !hasNoDivisorLessThan(k, i) ==> !sieve[k];
+                    assert hasDivisor(k);
+                    hasDivisorNotPrime(k);
+                    assert !is_prime(k);
+                }else{
+                    assert hasNoDivisorLessThan(k, i+1);
+                    assert k <= n;
+                    // if k < n {
+                    // NatSqrtExist(k);
+                    // var kroot: nat :| IsNatSqrt(kroot, k);
+                    // sqrtRelation(k,n,kroot, i);
+                    // assert kroot <= i;
+                    noDivisorsIsPrime(k,n,i);
+                    assert is_prime(k);
+                    // }else{
+
+                    // }
+                }
+            }
+        }
+    }
+    
+    twostate lemma oldMultisets(sieve: array<bool>, l: nat)
+        requires l <= sieve.Length
+        requires forall j :: 0 <= j < l <= sieve.Length ==> old(sieve[j]) == sieve[j]
+        ensures multiset(old(sieve[..l])) == multiset(sieve[..l])
+    {
+    }
+
+    twostate lemma oldMultisetsFull(sieve: array<bool>)
+        requires forall j :: 0 <= j <  sieve.Length ==> old(sieve[j]) == sieve[j]
+        ensures multiset(old(sieve[..])) == multiset(sieve[..])
+    {
+    }
+
+
+    method {:verify } {:vcs_split_on_every_assert} EratosthenesSieve(n: nat) returns (primes: set<nat>)        
         requires n > 2    
         //[1] i want to proof it:
         ensures forall k :: k in primes ==> is_prime(k)
@@ -322,31 +418,55 @@ module  Sieve {
             reveal is_prime();
         }
 
+         assert (forall k: nat :: 1 <= k < 2  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j));
+        // && (forall j:nat :: (i <= j < sieve.Length) ==> hasNoDivisorLessThan(j, i) ==> sieve[j])
+        assert forall j:nat :: (2 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, 2)) && (!sieve[j] ==> hasDivisor(j));
+
         // assert forall k:nat :: 0 <= k <= 2 ==> !sieve[i] ==> !is_prime(i) by {
         //     reveal is_prime();
         // }
 
         }
+        rootPlusOne(n, q);
+        assert allocated(sieve);
         // assume exists k: nat :: 2<= k < n && k*k < n && 3 <= k+1 < n && (k+1)*(k+1) >= n;
         // var k:nat :| 1<= k < n && prod(k,k) < n && 2<= k+1 < n && prod((k+1),(k+1)) >= n;
-        while i < q
+        while i <= q
+            invariant allocated(old(sieve))
+            invariant allocated(sieve)
             invariant n + 1 == sieve.Length        
             // invariant 2 <= i <= k+1
-            invariant 2 <= i <= q < n
+            invariant 2 <= i <= q+1 < n
             invariant 2 <= i < q ==> i*i < n
             invariant sievedPrimes(sieve, i)
             invariant i == q ==> i*i >= n
             // decreases n - i
         {
+            label S:
             if sieve[i] {            
-                forall j:nat | (i * i <= j < n) && (j % i == 0) { sieve[i] := false; }    
-                //[3] assertion might not hold        
-                // assert forall j:nat :: (i * i <= j < n) && (j % i == 0) ==> sieve[j] == false;
+                forall j:nat | (i * i <= j < sieve.Length) && (j % i == 0) { sieve[j] := false; }    
+                assert forall j:nat :: (i * i <= j < n) && (j % i == 0) ==> sieve[j] == false;
+            assert Preserved@S(sieve, i) by {
+                if i*i < sieve.Length {
+                    assert forall j :: 0 <= j < i*i ==> old@S(sieve[j]) == sieve[j];
+                    oldMultisets@S(sieve, i*i);
+                    assert multiset(old@S(sieve[..i*i])) == multiset(sieve[..i*i]);
+                }else{
+                    assert forall j :: 0 <= j < sieve.Length ==> old@S(sieve[j]) == sieve[j];
+                    oldMultisetsFull@S(sieve);
+                    assert multiset(old@S(sieve[..])) == multiset(sieve[..]);
+
+                }
             }
+            }
+            assert allocated(sieve);
+            assert allocated(old(sieve));
+            // SievedContinue(sieve, i);
             i := i + 1;
-            assume sievedPrimes(sieve, i);
+            // assume sievedPrimes(sieve, i);
         }
         assert sievedPrimes(sieve, i);
+        // SievedToQ(sieve, i, n);
         // assert allSievedPrimes(sieve);
         primes := {}; 
         for i := 2 to n {
