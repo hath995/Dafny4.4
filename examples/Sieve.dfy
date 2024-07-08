@@ -583,7 +583,9 @@ module  Sieve {
         SievedToQ(sieve, q, n);
         // assert allSievedPrimes(sieve);
         primes := {}; 
-        for i := 2 to n {
+        for i := 2 to n 
+            invariant forall x :: x in primes ==> is_prime(x)
+        {
             if sieve[i] {
                 assert i < sieve.Length;
                 assert is_prime(i);
