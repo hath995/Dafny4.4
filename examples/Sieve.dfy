@@ -206,8 +206,8 @@ module  Sieve {
         requires 2 <= i < sieve.Length
         reads sieve
     {
-        (i*i < sieve.Length && forall j:nat :: (i * i <= j < sieve.Length) && (j % i != 0) ==> old(sieve[j]) == sieve[j])
-        || old(sieve[..]) == sieve[..]
+        (i*i < sieve.Length ==> forall j:nat :: (i * i <= j < sieve.Length) && (j % i != 0) ==> old(sieve[j]) == sieve[j])
+        || (i*i >= sieve.Length ==> old(sieve[..]) == sieve[..])
     }
 
     // twostate lemma iUnchanged(sieve: array<bool>, i: nat)
@@ -241,14 +241,14 @@ module  Sieve {
         requires 2 <=i  < sieve.Length
         reads sieve
     {
-        forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> !sieve[i]
+        forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> sieve[j] == false
     }
 
     twostate lemma {:verify } {:vcs_split_on_every_assert} SievedContinue(sieve: array<bool>, i: nat)
         requires 2 <=i <i+1 < sieve.Length
         requires old(sievedPrimes(sieve, i))
         requires Preserved(sieve, i)
-        // requires PreservedRest(sieve, i)
+        requires PreservedRest(sieve, i)
         requires sieve[i] ==> forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> !sieve[j]
         ensures sievedPrimes(sieve, i+1)
     {
@@ -507,7 +507,7 @@ module  Sieve {
     {
         var sieve: array<bool> := new bool[n+1];
         forall i:nat | 0 <= i < 2 { sieve[i] := false; }    
-        forall i:nat | 2 <= i < n { sieve[i] := true; }    
+        forall i:nat | 2 <= i < sieve.Length { sieve[i] := true; }    
 
 
         var i: nat := 2;
@@ -515,33 +515,35 @@ module  Sieve {
         assert q < n;
         assert forall i:nat :: 2 <= i < n ==> sieve[i] == true;
         assert sievedPrimes(sieve, 2) by {
-        assert sieve[0] == false;
-        assert sieve[1] == false;
-        assert !is_prime(0) by {
-            reveal is_prime();
-        }
-        assert !is_prime(1) by {
-            reveal is_prime();
-        }
-        assert sieve[2] == true;
-        assert is_prime(2) by {
-            reveal is_prime();
-        }
-        assert forall k:nat :: 0 <= k <= 2 ==> (sieve[i] ==> is_prime(i)) && !sieve[i] ==> !is_prime(i) by {
-            reveal is_prime();
-        }
+            assert sieve[0] == false;
+            assert sieve[1] == false;
+            assert !is_prime(0) by {
+                reveal is_prime();
+            }
+            assert !is_prime(1) by {
+                reveal is_prime();
+            }
+            assert sieve[2] == true;
+            assert is_prime(2) by {
+                reveal is_prime();
+            }
+            assert forall k:nat :: 0 <= k <= 2 ==> (sieve[i] ==> is_prime(i)) && !sieve[i] ==> !is_prime(i) by {
+                reveal is_prime();
+            }
 
-         assert (forall k: nat :: 1 <= k < 2  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j));
-        // && (forall j:nat :: (i <= j < sieve.Length) ==> hasNoDivisorLessThan(j, i) ==> sieve[j])
-        assert forall j:nat :: (2 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, 2)) && (!sieve[j] ==> hasDivisor(j));
-
-        // assert forall k:nat :: 0 <= k <= 2 ==> !sieve[i] ==> !is_prime(i) by {
-        //     reveal is_prime();
-        // }
-
+            assert (forall k: nat :: 1 <= k < 2  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j));
+            assert forall j:nat :: (2 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, 2)) && (!sieve[j] ==> hasDivisor(j)) by {
+                assert forall j:nat :: 2 <= j < sieve.Length ==> sieve[j];
+                forall j: nat | 2 <= j < sieve.Length
+                ensures (sieve[j] ==> hasNoDivisorLessThan(j, 2)) && (!sieve[j] ==> hasDivisor(j))
+                {
+                    assert sieve[j];
+                    reveal hasNoDivisorLessThan();
+                    assert hasNoDivisorLessThan(j, 2);
+                }
+            }
         }
         rootPlusOne(n, q);
-        assert allocated(sieve);
         // assume exists k: nat :: 2<= k < n && k*k < n && 3 <= k+1 < n && (k+1)*(k+1) >= n;
         // var k:nat :| 1<= k < n && prod(k,k) < n && 2<= k+1 < n && prod((k+1),(k+1)) >= n;
         while i <= q
