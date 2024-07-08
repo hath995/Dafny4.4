@@ -244,7 +244,11 @@ module  Sieve {
         forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> sieve[j] == false
     }
 
-    twostate lemma {:verify } {:vcs_split_on_every_assert} SievedContinue(sieve: array<bool>, i: nat)
+    twostate lemma {:verify } {:vcs_split_on_every_assert} SievedContinue(sieve: array<bool>, i: nat, q: nat, n: nat)
+        requires n > 2
+        requires sieve.Length == n+1
+        requires IsNatSqrt(q, n)
+        requires i <= q+1
         requires 2 <=i <i+1 < sieve.Length
         requires old(sievedPrimes(sieve, i))
         requires Preserved(sieve, i)
@@ -254,59 +258,88 @@ module  Sieve {
     {
 
         if sieve[i] {
-        assert i <= i < sieve.Length;
-        // assert (forall j:nat :: (i <= j < sieve.Length) ==> (old(sieve[j]) ==> hasNoDivisorLessThan(j, i)) && (!old(sieve[j]) ==> hasDivisor(j)));
-        assert hasNoDivisorLessThan(i,i);
-        assert is_prime(i);
-        assert (forall k: nat :: 0 <= k <= i+1 ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))) by {
-            assert (forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)));
-            assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1)) by {
-                assert sieve[2] by {
-                    reveal is_prime();
-                    assert is_prime(2);
-                }
-                assert sieve[3] by {
-                    reveal is_prime();
-                    assert is_prime(3);
-                    PrimeHasNoDivisor(3);
-                }
-                if i == 2 {
-                    assert is_prime(3) by {
+            assert i <= i < sieve.Length;
+            // assert (forall j:nat :: (i <= j < sieve.Length) ==> (old(sieve[j]) ==> hasNoDivisorLessThan(j, i)) && (!old(sieve[j]) ==> hasDivisor(j)));
+            assert hasNoDivisorLessThan(i,i);
+            assert is_prime(i);
+            assert (forall k: nat :: 0 <= k <= i+1 ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))) by {
+                assert (forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)));
+                assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1)) by {
+                    assert sieve[2] by {
                         reveal is_prime();
+                        assert is_prime(2);
                     }
-                    assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1));
-                }else{
-                    assert i >= 3;
-                    primesMostlyOdd(i);
-                    assert (i+1) % 2 == 0;
-                    assert !is_prime(i+1) by {
+                    assert sieve[3] by {
                         reveal is_prime();
+                        assert is_prime(3);
+                        PrimeHasNoDivisor(3);
                     }
-                    assert !sieve[i+1] by {
-                        assert old(sieve[i+1]) == sieve[i+1];
-                        assert forall k: nat :: 1 <= k < i  ==> old(sieve[k]) ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !old(sieve[j]) && hasDivisor(j);
-                        assert 1 <= 2 < i;
-                        assert forall j:nat :: (2*2 <= j < sieve.Length) && (j % 2 == 0) ==> !sieve[j] && hasDivisor(j);
+                    if i == 2 {
+                        assert is_prime(3) by {
+                            reveal is_prime();
+                        }
+                        assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1));
+                    }else{
+                        assert i >= 3;
+                        primesMostlyOdd(i);
+                        assert (i+1) % 2 == 0;
+                        assert !is_prime(i+1) by {
+                            reveal is_prime();
+                        }
+                        assert !sieve[i+1] by {
+                            assert old(sieve[i+1]) == sieve[i+1];
+                            assert forall k: nat :: 1 <= k < i  ==> old(sieve[k]) ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !old(sieve[j]) && hasDivisor(j);
+                            assert 1 <= 2 < i;
+                        }
+                        assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1));
                     }
-                    assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1));
+                }
+                // unless i == 2 then if i is prime then i+1 is even ==> !is_prime(i+1)
+                // 2*2 <= j < sieve.Lenght && (i+1)%2 == 0 ==> !sieve[i+1] && hasDivisor(i+1)
+            }
+            assert (forall k: nat :: 1 <= k < i+1  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j)) by {
+                assert forall k : nat :: 1 <= k < i ==> old(sieve[k]) ==> forall j: nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !old(sieve[j]) && hasDivisor(j); 
+                forall k : nat | 1 <= k < i+1
+                    ensures sieve[k] ==> forall j: nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j)
+                {
+                    if sieve[k] {
+                        forall j: nat | k*k <= j < sieve.Length && (j%k == 0)
+                            ensures !sieve[j] && hasDivisor(j)
+                        {
+                            if k == i {
+
+                            }else{
+                                assert k < i;
+                                if j % i != 0 {
+                                assert old(sieve[j]) == sieve[j];
+                                }else{
+                                assert old(sieve[j]) == sieve[j];
+
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            // unless i == 2 then if i is prime then i+1 is even ==> !is_prime(i+1)
-            // 2*2 <= j < sieve.Lenght && (i+1)%2 == 0 ==> !sieve[i+1] && hasDivisor(i+1)
-        }
-        assert (forall k: nat :: 1 <= k < i+1  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j));
-        assert (forall j:nat :: (i+1 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, i+1)) && (!sieve[j] ==> hasDivisor(j))) by {
+            assert (forall j:nat :: (i+1 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, i+1)) && (!sieve[j] ==> hasDivisor(j))) by {
+                forall j: nat | i+1 <= j < sieve.Length
+                    ensures (sieve[j] ==> hasNoDivisorLessThan(j, i+1)) && (!sieve[j] ==> hasDivisor(j))
+                {
 
-        }
-        assert sievedPrimes(sieve, i+1);
+                }
+            }
+            assert sievedPrimes(sieve, i+1);
         }else{
-        assert !is_prime(i);
-        assert hasDivisor(i);
-        assert (forall k: nat :: 0 <= k <= i+1 ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)));
-        assert (forall k: nat :: 1 <= k < i+1  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j));
-        assert (forall j:nat :: (i+1 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, i+1)) && (!sieve[j] ==> hasDivisor(j)));
+            assert !is_prime(i);
+            assert hasDivisor(i);
+            assert (forall k: nat :: 0 <= k <= i+1 ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k))) by {
+                assert (forall k: nat :: 0 <= k <= i ==> (sieve[k] ==> is_prime(k)) && (!sieve[k] ==> !is_prime(k)));
+                assert (sieve[i+1] ==> is_prime(i+1)) && (!sieve[i+1] ==> !is_prime(i+1));
+            }
+            assert (forall k: nat :: 1 <= k < i+1  ==> sieve[k] ==> forall j:nat :: (k*k <= j < sieve.Length) && (j % k == 0) ==> !sieve[j] && hasDivisor(j));
+            assert (forall j:nat :: (i+1 <= j < sieve.Length) ==> (sieve[j] ==> hasNoDivisorLessThan(j, i+1)) && (!sieve[j] ==> hasDivisor(j)));
 
-        assert sievedPrimes(sieve, i+1);
+            assert sievedPrimes(sieve, i+1);
         }
     }
     
@@ -577,7 +610,7 @@ module  Sieve {
             assert PreservedRest@S(sieve, i);
             assert old@S(sievedPrimes(sieve, i));
             assert sieve[i] ==> forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> sieve[j] == false;
-            SievedContinue@S(sieve, i);
+            SievedContinue@S(sieve, i, q, n);
             i := i + 1;
             // assume sievedPrimes(sieve, i);
         }
