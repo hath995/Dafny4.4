@@ -249,7 +249,7 @@ module  Sieve {
         requires old(sievedPrimes(sieve, i))
         requires Preserved(sieve, i)
         // requires PreservedRest(sieve, i)
-        requires sieve[i] ==> forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> !sieve[i]
+        requires sieve[i] ==> forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> !sieve[j]
         ensures sievedPrimes(sieve, i+1)
     {
 
@@ -557,7 +557,7 @@ module  Sieve {
             label S:
             if sieve[i] {            
                 forall j:nat | (i * i <= j < sieve.Length) && (j % i == 0) { sieve[j] := false; }    
-                assert forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> sieve[j] == false;
+                assert forall j:nat :: (i * i <= j < sieve.Length) && (j % i == 0) ==> !sieve[j];
                 assert multiplesOfINotPrime(sieve, i);
             }
             assert Preserved@S(sieve, i) by {
