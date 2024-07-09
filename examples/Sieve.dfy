@@ -730,6 +730,17 @@ module  Sieve {
             }
         }
     }
+
+    lemma ContainsAllPrimes(sieve: array<bool>, i: nat, n: nat)
+        requires n > 2
+        requires n+1 == sieve.Length
+        requires 0 <= i < sieve.Length
+        requires IsNatSqrt(i, n)
+        requires sievedPrimes(sieve, i+1)
+        ensures forall k :: 2 <= k <= n && is_prime(k) ==> sieve[k]
+    {
+        SievedToQ(sieve, i, n); 
+    }
     
     twostate lemma oldMultisets(sieve: array<bool>, l: nat)
         requires l <= sieve.Length
@@ -813,8 +824,6 @@ module  Sieve {
             invariant 2 <= i <= q+1 < n
             invariant 2 <= i < q ==> i*i < n
             invariant sievedPrimes(sieve, i)
-            // invariant forall k :: 2 <= k <=i && is_prime(k) ==> sieve[k]
-            // invariant forall k :: 2 <= k <=i*i < sieve.Length && is_prime(k) ==> sieve[k]
             invariant i == q ==> i*i >= n
         {
             label S:
@@ -838,9 +847,8 @@ module  Sieve {
             SievedContinue@S(sieve, i, q, n);
             i := i + 1;
         }
-        // assert sievedPrimes(sieve, q+1);
         SievedToQ(sieve, q, n);
-        assume forall k :: 2 <= k <= n && is_prime(k) ==> sieve[k]; //@TODO: 
+        ContainsAllPrimes(sieve, q, n);
         primes := {}; 
         var z := 1;
         while z <= n
