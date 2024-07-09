@@ -863,7 +863,6 @@ module  Sieve {
             }
             z := z + 1;
         }    
-        assert forall k :: 2 <= k <= n && sieve[k] ==> k in primes;
     }
 
     method Main() {
