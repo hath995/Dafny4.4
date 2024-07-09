@@ -96,6 +96,11 @@ module SOSqrt {
     {
         assert s > 1 && (i-1)*(i-1) < s && i*i >= s;
         assert t > 1 && (j-1)*(j-1) < t && j*j >= t;
+        if s == 2 && t == 3 {
+
+        }else{
+
+        }
         assert i <= j;
     }
 
