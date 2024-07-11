@@ -814,8 +814,6 @@ module  Sieve {
 
         var i: nat := 2;
         var q := sqrt(n);
-        assert q < n;
-        assert forall i:nat :: 2 <= i < n ==> sieve[i] == true;
         SieveTo2(sieve, n, i);
         rootPlusOne(n, q);
         while i <= q

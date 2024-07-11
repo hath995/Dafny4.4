@@ -266,6 +266,64 @@ module Median {
             list[|list| / 2] as real
     }
 
+    ghost function selectLessThan(list: seq<int>, x: int): multiset<int>
+    {
+        if list == [] then 
+            multiset{} 
+        else if list[0] <= x then
+            multiset{list[0]}+selectLessThan(list[1..], x) 
+        else
+            multiset{list[0]}+selectLessThan(list[1..], x) 
+    }
+
+    ghost function selectGreaterThan(list: seq<int>, x: int): multiset<int>
+    {
+        if list == [] then 
+            multiset{} 
+        else if list[0] >= x then
+            multiset{list[0]}+selectGreaterThan(list[1..], x) 
+        else
+            multiset{list[0]}+selectGreaterThan(list[1..], x) 
+    }
+
+    lemma SelectLessThan(list: seq<int>, x: int)
+        ensures forall y :: y in list && y <= x ==> y in selectLessThan(list, x)
+    {
+    }
+    
+    lemma SelectGreaterThan(list: seq<int>, x: int)
+        ensures forall y :: y in list && y >= x ==> y in selectGreaterThan(list, x)
+    {}
+
+    ghost predicate multisetLTE(ms: multiset<int>, x: int) {
+        forall y :: y in ms ==> y <= x
+    }
+
+    ghost predicate multisetGTE(ms: multiset<int>, x: int) {
+        forall y :: y in ms ==> y >= x
+    }
+
+    ghost predicate IsMedian(list: seq<int>, x: int) 
+    {
+        if |list| % 2 == 1 then
+            x in list && exists lms, gms :: multisetLTE(lms, x) && multisetGTE(gms, x) && (|lms| == |list|/2) && (|gms| == |list|/2) && lms + gms + multiset{x} == multiset(list)
+        else
+            x in list && exists lms, gms :: multisetLTE(lms, x) && multisetGTE(gms, x)  && lms + gms + multiset{x} == multiset(list)
+
+    }
+
+    // ghost function pickMedian(list: seq<int>): real
+    //     requires |list| > 0
+    // {
+    //     if |list| % 2 == 0 then
+    //         var x :| x in list && |selectLessThan(list, x)| == |list|/2-1;
+    //         var y :| y in list && |selectGreaterThan(list,x)| == |list|/2-1;
+    //         (x+y) as real / 2.0
+    //     else
+    //         var x :| x in list && |selectLessThan(list, x)| == |list|/2 && |selectGreaterThan(list,x)| == |list|/2;
+    //         x as real
+    // }
+
 /*
     let n1 = nums1.length, n2 = nums2.length;
         

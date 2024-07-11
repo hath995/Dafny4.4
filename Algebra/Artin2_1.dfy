@@ -36,16 +36,21 @@ module Artin {
     //!A signifies type invariance
     datatype Group<!A> = Group(elements: set<A>, identity: A, compose: (A,A) -> A, inverse: (A) -> A)
 
-    ghost predicate isIdentity<A(!new)>(g: Group<A>) {
+    opaque ghost predicate isIdentity<A(!new)>(g: Group<A>) {
         forall a :: inGroup(g,a) ==> g.compose(a,g.identity) == a && g.compose(g.identity, a) == a
     }
 
-    lemma GroupIdentity<A>(g: Group<A>, a: A) 
+    lemma GroupIdentity<A(!new)>(g: Group<A>, a: A) 
+        requires ValidGroup(g)
         requires inGroup(g, a)
         ensures g.compose(a,g.identity) == a && g.compose(g.identity, a) == a
+    {
+       reveal ValidGroup();
+       reveal isIdentity(); 
+    }
     
 
-    ghost predicate closedComposition<A(!new)>(g: Group<A>) {
+    opaque ghost predicate closedComposition<A(!new)>(g: Group<A>) {
         // forall x,y :: x in g.elements && y in g.elements ==> g.compose(x,y) in g.elements
         forall x: A, y: A :: inGroup(g,x) && inGroup(g,y) ==> inGroup(g, g.compose(x,y))
     }
@@ -106,7 +111,7 @@ module Artin {
 
 
     lemma areInverses<A(!new)>(g: Group<A>, a: A,  b: A)
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         requires a in g.elements && b in g.elements
         requires inGroup(g,a) && inGroup(g,b)
         requires g.compose(a, b) == g.identity && g.compose(b,a) == g.identity
@@ -144,7 +149,7 @@ module Artin {
         }
     }
 
-    ghost predicate ValidGroup<A(!new)>(g: Group<A>) {
+    opaque ghost predicate ValidGroup<A(!new)>(g: Group<A>) {
         // g.identity in g.elements &&
         inGroup(g, g.identity) &&
         isIdentity(g) &&
@@ -167,8 +172,11 @@ module Artin {
     }
 
     lemma VGAIdentity<A(!new)>(g: Group<A>)
-        requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         ensures isIdentity(g)
+    {
+        reveal ValidGroup();
+    }
 
     ghost predicate ValidSubGroup<A(!new)>(g: Group<A>, h: Group<A>) {
         h.elements <= g.elements &&
@@ -185,7 +193,7 @@ module Artin {
     }
 
     lemma {:verify true} groupCompositionInverse<A(!new)>(g: Group<A>, a: A, b: A, abar: A, bbar: A, abbar: A)
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         requires inGroup(g, a)
         requires inGroup(g,b)
         requires g.inverse(a) == abar
@@ -245,8 +253,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     {
         if n == 0 then g.identity else g.compose(elem, apow(g, elem, n-1)) 
     }
-    lemma npowPos<A>(g: Group, elem: A, n: int)
+    lemma npowPos<A(!new)>(g: Group, elem: A, n: int)
         requires n > 0
+        requires ValidGroup(g)
         requires inGroup(g, elem)
         ensures npow(g,elem,n) == g.compose(npow(g, elem, n-1), elem)
     {
@@ -290,12 +299,14 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     }
 
     lemma zandapowEqual<A(!new)>(g: Group, elem: A, z: int)
+        requires ValidGroup(g)
         requires inGroup(g, elem)
         requires inGroup(g, g.identity)
         requires isIdentity(g)
         decreases z * z
         ensures apow(g, elem, z) == zpow(g, elem, z)
     {
+        reveal isIdentity();
         if z >= 0 {
             assert apow(g, elem, z) == zpow(g, elem, z);
         }else{
@@ -346,10 +357,12 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
 
 
     lemma onePower<A(!new)>(g: Group, elem: A)
+        requires ValidGroup(g)
         requires elem in g.elements
         requires isIdentity(g)
         ensures apow(g, elem, 1) == elem
     {
+        reveal isIdentity();
         calc {
             apow(g, elem, 1);
             g.compose(elem, apow(g, elem, 0));
@@ -358,7 +371,8 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         }
     }
 
-    lemma oneMinusPower<A>(g: Group, elem: A)
+    lemma oneMinusPower<A(!new)>(g: Group, elem: A)
+        requires ValidGroup(g)
         // requires elem in g.elements
         requires inGroup(g, elem)
         // requires isIdentity(g)
@@ -431,7 +445,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
 
     // method {:verify true} apowSubtract<A>(g: Group<A>, elem: A, n: int)
     lemma {:verify } {:induction false} apowSubtract<A(!new)>(g: Group<A>, elem: A, n: int)
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         // requires closedComposition(g)
         // requires closedInverse(g)
         // requires associativeComposition(g)
@@ -489,12 +503,12 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     lemma apowAdditionAxiomNeg<A>(g: Group<A>, elem: A, n: int, k: int)
         ensures g.compose(apow(g, elem, -n), apow(g, elem, -k)) == apow(g, elem, -n-k)
 
-    lemma {:verify true} apowAddition<A>(g: Group<A>, elem: A, n: nat, k: nat)
+    lemma {:verify true} apowAddition<A(!new)>(g: Group<A>, elem: A, n: nat, k: nat)
         // requires elem in g.elements
         // requires g.identity in g.elements
         requires inGroup(g, elem)
         requires inGroup(g, g.identity)
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         // requires closedComposition(g)
         // requires closedInverse(g)
         // requires inGroup(g, g.identity)
@@ -532,7 +546,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     lemma npowInverse<A(!new)>(g: Group<A>, elem: A, n: int)
         requires n > 0
         requires elem in g.elements
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         ensures g.inverse(npow(g,elem, n)) == zpow(g, elem, -n)
     {
 
@@ -541,6 +555,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     lemma zpowInverseCompose<A(!new)>(g: Group<A>, elem: A, z: int)
         requires z < 0
         requires elem in g.elements
+        requires ValidGroup(g)
         decreases -z
         ensures g.compose(zpow(g, elem, (z+1)), g.inverse(elem)) == zpow(g, elem, z)
     {
@@ -582,6 +597,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     }
 
     lemma zpowInverseComposeTwo<A(!new)>(g: Group<A>, elem: A, z: int)
+        requires ValidGroup(g)
         requires z < 0
         requires elem in g.elements
         requires inGroup(g, elem)
@@ -628,6 +644,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     }
 
     lemma apowInverse<A(!new)>(g: Group<A>, elem: A, n: int)
+        requires ValidGroup(g)
         requires elem in g.elements
         // requires ValidGroup(g)
         ensures g.inverse(apow(g,elem, n)) == apow(g, elem, -n)
@@ -653,6 +670,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
     // }
 
     lemma {:verify false} apowAdditionInt<A(!new)>(g: Group<A>, elem: A, n: int, k: int)
+        requires ValidGroup(g)
         requires elem in g.elements
         // requires ValidGroup(g)
         // requires closedComposition(g)
@@ -763,9 +781,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
 
     }
 
-    lemma {:verify }  something<A>(g: Group<A>, elem: A, k: nat, s: nat)
+    lemma {:verify }  something<A(!new)>(g: Group<A>, elem: A, k: nat, s: nat)
         requires elem in g.elements
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         // requires closedComposition(g)
         // requires closedInverse(g)
         requires g.identity in g.elements
@@ -789,7 +807,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
 
     lemma {:verify false}  apowExponentNat<A(!new)>(g: Group<A>, elem: A, k: nat, s: nat)
         requires elem in g.elements
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         requires closedComposition(g)
         requires closedInverse(g)
         requires g.identity in g.elements
@@ -822,10 +840,10 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires inGroup(g, g.identity)
         ensures apow(g, apow(g, elem, k), s) == apow(g, elem, Math.prod(k,s))
 
-    lemma {:verify }  apowExponent<A>(g: Group<A>, elem: A, k: nat, s: nat)
+    lemma {:verify }  apowExponent<A(!new)>(g: Group<A>, elem: A, k: nat, s: nat)
         requires inGroup(g, elem)
         requires inGroup(g, g.identity)
-        // requires ValidGroup(g)
+        requires ValidGroup(g)
         // requires closedComposition(g)
         // requires closedInverse(g)
         // requires inGroup(g, g.identity)
@@ -864,7 +882,8 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         }
     }
 
-    lemma {:verify }  apowExponentIn<A>(g: Group<A>, elem: A, k: nat, s: nat)
+    lemma {:verify }  apowExponentIn<A(!new)>(g: Group<A>, elem: A, k: nat, s: nat)
+        requires ValidGroup(g)
         requires inGroup(g, elem)
         requires inGroup(g, g.identity)
         ensures inGroup(g, apow(g, elem, Math.prod(k,s)))
@@ -899,7 +918,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires g.compose(x, g.compose(y,x)) == g.compose(y, g.compose(x, y))
         ensures g'.compose(phi(x), g'.compose(phi(y), phi(x))) == g'.compose(phi(y), g'.compose(phi(x), phi(y)))
     {
-
+        reveal ValidGroup();
+        reveal isIdentity();
+        reveal closedComposition();
     }
 
     lemma Artin2_3_c<A(!new),B(!new)>(g: Group<A>, g': Group<B>, phi: A -> B, x: A) 
@@ -910,6 +931,8 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         ensures g'.inverse(phi(x)) == phi(g.inverse(x))
     {
 
+        reveal ValidGroup();
+        reveal isIdentity();
         assert g.compose(x, g.inverse(x)) == g.identity;
         assert g'.compose(phi(x), phi(g.inverse(x))) == phi(g.identity) == g'.identity;
         assert g.compose(g.inverse(x), x) == g.identity;
@@ -938,9 +961,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires elem in g.elements
         requires elem in h.elements
         requires CyclicGroupGeneratedBy(g, elem)
-        requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         requires h.elements <= g.elements
-        requires ValidGroupAxiom(h)
+        requires ValidGroup(h)
         requires ValidSubGroup(g, h)
         ensures apow(h, elem, n) == apow(g, elem, n)
         ensures apow(h, elem, n) in h.elements
@@ -948,7 +971,8 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         if n == 0 {
             // assert apow(h, elem, 0) == h.identity;
         } else if n == 1 {
-            VGAIdentity(g);
+            // VGAIdentity(g);
+            reveal ValidGroup();
             onePower(h, elem);
             // assert apow(h, elem, 1) == elem;
         } else{
@@ -962,9 +986,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires t in g.elements && t in h.elements
         requires t == apow(g, elem, i)
         requires CyclicGroupGeneratedBy(g, elem)
-        requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         requires h.elements <= g.elements
-        requires ValidGroupAxiom(h)
+        requires ValidGroup(h)
         requires ValidSubGroup(g, h)
         decreases n*n
         // ensures apow(h, elem, n) == apow(g, elem, n)
@@ -983,6 +1007,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         } else if n == 1 {
             VGAIdentity(g);
             VGAIdentity(h);
+            reveal isIdentity();
             assert apow(h, t, 1) == t;
             calc {
                 Math.prod(i,n);
@@ -1040,9 +1065,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires elem in g.elements
         requires elem in h.elements
         requires CyclicGroupGeneratedBy(g, elem)
-        requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         requires h.elements <= g.elements
-        requires ValidGroupAxiom(h)
+        requires ValidGroup(h)
         requires ValidSubGroup(g, h)
         ensures h.elements == g.elements
     {
@@ -1068,9 +1093,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires z in h.elements
         requires y in h.elements
         requires CyclicGroupGeneratedBy(g, elem)
-        requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         requires h.elements <= g.elements
-        requires ValidGroupAxiom(h)
+        requires ValidGroup(h)
         requires ValidSubGroup(g, h)
         ensures exists hx: A :: hx in h.elements && CyclicGroupGeneratedBy(h, hx)
     {
@@ -1079,17 +1104,14 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
             apow(g, elem, n) == g.identity &&
             (forall i :: 1 < i < n ==> apow(g, elem, i) != g.identity)  &&
             forall x :: x in g.elements ==> exists i :: 0 <= i < n && apow(g, elem, i) == x;
-        assert y in g.elements;
-        assert z in g.elements;
-        var i :| 0 <= i < n && apow(g, elem, i) == y;
-        var k :| 0 <= k < n && apow(g, elem, k) == z;
-        VGAIdentity(g);
-        onePower(g, g.identity);
-        assert i > 1;
-        assert k > 1;
-        var common := Math.Gcd(i, k);
-        if common == 1 {
+        assert isIdentity(g) by {
+            reveal ValidGroup();
+        }
+        reveal isIdentity();
+        // var common := Math.Gcd(i, k);
+        if elemA: A, elemB: A, i: int, k: int :| elemA != elemB && inGroup(h, elemA) && inGroup(h, elemB) && 1 <= i < n && apow(g, elem, i) == elemA && 1 <= k < n && apow(g, elem, k) == elemB && Math.Gcd(i,k) == 1 {
             VGAIdentity(g);
+            reveal isIdentity();
             onePower(g, elem);
             allApowClosed(g, elem);
             // allApowClosed(h, elem);
@@ -1100,11 +1122,11 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
             apowExponentInt(g,elem,i, u);
             assert apow(g, apow(g, elem, i), u) == apow(g, elem, Math.prod(i, u));
             AllSubgroupsOfCyclicSubgroupsAreCyclicGenerated2(g, elem, h, u, apow(g, elem, i), i);
-            assert apow(h, y, u) == apow(g, elem, Math.prod(i, u));
+            assert apow(h, elemA, u) == apow(g, elem, Math.prod(i, u));
 
             AllSubgroupsOfCyclicSubgroupsAreCyclicGenerated2(g, elem, h, v, apow(g, elem, k), k);
             apowExponentInt(g,elem,k, v);
-            assert apow(h, z, v) == apow(g, elem, Math.prod(k, v));
+            assert apow(h, elemB, v) == apow(g, elem, Math.prod(k, v));
             // assert apow(g, apow(g, elem, i), x) == apow(g, elem, Math.prod(i,x));
 
             calc {
@@ -1120,6 +1142,15 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
             assert elem in h.elements;
             AllSubgroupsOfCyclicSubgroupsAreCyclicIfElem(g, elem, h);
         }else{
+            assert !(exists elemA: A, elemB: A, i: int, k: int :: elemA != elemB && inGroup(h, elemA) && inGroup(h, elemB) && 1 <= i < n && apow(g, elem, i) == elemA && 1 <= k < n && apow(g, elem, k) == elemB && Math.Gcd(i,k) == 1);
+            assert y in g.elements;
+            assert z in g.elements;
+            var i :| 0 <= i < n && apow(g, elem, i) == y;
+            var k :| 0 <= k < n && apow(g, elem, k) == z;
+            onePower(g, g.identity);
+            assert i > 1;
+            assert k > 1;
+            assert forall elemA: A, elemB: A, i: int, k: int :: elemA != elemB && inGroup(h, elemA) && inGroup(h, elemB) && 1 <= i < n && apow(g, elem, i) == elemA && 1 <= k < n && apow(g, elem, k) == elemB ==> Math.Gcd(i,k) != 1;
 
         }
     }
@@ -1129,9 +1160,9 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires elem != g.identity
         requires elem in h.elements
         requires CyclicGroupGeneratedBy(g, elem)
-        requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         requires h.elements <= g.elements
-        requires ValidGroupAxiom(h)
+        requires ValidGroup(h)
         requires ValidSubGroup(g, h)
         ensures exists hx: A :: hx in h.elements && CyclicGroupGeneratedBy(h, hx)
     {
@@ -1159,9 +1190,11 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
         requires elem in g.elements
         requires elem != g.identity
         requires CyclicGroupGeneratedBy(g, elem)
-        requires ValidGroupAxiom(g)
+        // requires ValidGroupAxiom(g)
+        requires ValidGroup(g)
         requires h.elements <= g.elements
-        requires ValidGroupAxiom(h)
+        // requires ValidGroupAxiom(h)
+        requires ValidGroup(h)
         requires ValidSubGroup(g, h)
         ensures exists hx: A :: hx in h.elements && CyclicGroupGeneratedBy(h, hx)
     {
@@ -1178,6 +1211,7 @@ function realExp(r: real, e: int): real decreases if e > 0 then e else -e {
             var y :| y in h.elements && y != elem;
             if z :| z in h.elements && z != y {
                 VGAIdentity(g);
+                reveal isIdentity();
                 onePower(g, g.identity);
                 assert z in g.elements;
                 var i :| 0 <= i < n && apow(g, elem, i) == y;
