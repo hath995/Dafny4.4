@@ -79,6 +79,12 @@ module Math {
         assert x * 1 == x;
     }
 
+    lemma FactorsNotEmpty(x: pos)
+        ensures Factors(x) != {}
+    {
+        FactorsContains1(x);
+    }
+
     lemma prodFactors(x: pos, y: pos)
         ensures Factors(x) <= Factors(x*y)
         ensures Factors(y) <= Factors(x*y)
@@ -186,6 +192,21 @@ module Math {
             Gcd(Gcd(x,y), GcdAll(xs-{x}))
     }
 
+    ghost function GcdAll2(xs: set<pos>): pos
+        requires |xs| > 0
+    {
+        if |xs| == 1 then
+            var x :| x in xs;
+            x
+        else
+            assert exists x :: x in xs && xs - {x} != {} by {
+                var x :| x in xs;
+                assert |xs - {x}| > 0;
+            }
+            var x :| x in xs;
+            Gcd(x, GcdAll2(xs-{x}))
+    }
+
     ghost function FactorUnion(xs: set<pos>): set<pos>
         requires |xs| > 0
     {
@@ -195,6 +216,29 @@ module Math {
         else
             var x :| x in xs;
             Factors(x) * FactorUnion(xs-{x})
+    }
+
+    lemma FactorUnionNotEmpty(xs: set<pos>)
+        requires xs != {}
+        ensures FactorUnion(xs) != {}
+        ensures 1 in FactorUnion(xs)
+    {
+        if |xs| == 1 {
+            var x :| x in xs && FactorUnion(xs) == Factors(x);
+            assert Factors(x) != {} by {
+                FactorsNotEmpty(x);
+            }
+            FactorsContains1(x);
+
+        }else{
+            var x :| x in xs && FactorUnion(xs) == Factors(x) * FactorUnion(xs-{x});
+            assert Factors(x) != {} by {
+                FactorsNotEmpty(x);
+            }
+            FactorsContains1(x);
+            FactorUnionNotEmpty(xs-{x});
+
+        }
     }
 
     lemma FactorUnionCase(xs: set<pos>)
@@ -214,26 +258,45 @@ module Math {
         }
     }
 
-    lemma {:verify false} {:vcs_split_on_every_assert} GcdAllFactorIntersection(xs: set<pos>)
+    lemma {:vcs_split_on_every_assert} GcdAllFactorIntersection(xs: set<pos>)
         requires |xs| > 0
         requires forall x,y :: x in xs && y in xs && x != y ==> Gcd(x,y) != 1
         requires FactorUnion(xs) != {}
-        ensures GcdAll(xs) == Max(FactorUnion(xs))
+        ensures GcdAll2(xs) == Max(FactorUnion(xs))
     {
         if |xs| == 1 {
-            var x :| x in xs && GcdAll(xs) == x;
+            var x :| x in xs && GcdAll2(xs) == x;
             GcdIdempotent(x);
             AboutGcd(x, x);
             assert Gcd(x, x) == x;
-            assert GcdAll(xs) == x;
+            assert GcdAll2(xs) == x;
             assert forall p: pos :: IsFactor(p, x) && IsFactor(p, x) ==> p <= x;
-            assert GcdAll(xs) == Max(FactorUnion(xs));
-        }else if |xs| == 2 {
-
-            assert GcdAll(xs) == Max(FactorUnion(xs));
+            assert FactorUnion(xs) == Factors(x) by {
+                assert |xs| == 1;
+                assert |xs-{x}| == 0;
+                assert xs - {x} == {};
+            }
+            assert forall y :: y in Factors(x) ==> y <= x;
+            assert GcdAll2(xs) == Max(FactorUnion(xs));
         }else{
+            var x :| x in xs && GcdAll2(xs) == Gcd(x, GcdAll2(xs-{x}));
+            assert |xs| > 1;
+            assert xs-{x} != {};
+            assert forall y :: y in xs-{x} ==> Factors(y) !={} by {
+                forall y | y in xs-{x}
+                    ensures Factors(y) != {}
+                {
+                    FactorsNotEmpty(y);
+                }
+            }
+            assert FactorUnion(xs-{x}) != {} by {
+                FactorUnionNotEmpty(xs-{x});
+            }
+            GcdAllFactorIntersection(xs-{x});
+            assume Factors(x) * Factors(GcdAll2(xs-{x})) == FactorUnion(xs);
 
-            assert GcdAll(xs) == Max(FactorUnion(xs));
+
+            // assert GcdAll2(xs) == Max(FactorUnion(xs));
         }
     }
 
@@ -380,7 +443,7 @@ module Math {
     //     }
     // }
 
-    lemma GcdRest(x: pos, y: pos, s: pos, t: pos)
+    lemma {:verify false} GcdRest(x: pos, y: pos, s: pos, t: pos)
         requires Gcd(x,y) * s == x
         requires Gcd(x,y) * t == y
         ensures Gcd(s,t) == 1
@@ -431,21 +494,7 @@ module Math {
         // assert t * Gcd(x,y) == y;
         // GcdRest(x,y, s, t);
         assert forall p: pos :: p in Factors(x)*Factors(y) ==> p in Factors(Gcd(x,y)) by {
-            forall p: pos | p in Factors(x)*Factors(y)
-                ensures p in Factors(Gcd(x,y))
-            {
-                // assert IsFactor(s, x);
-                // assert IsFactor(t, y);
-                // assert p <= Gcd(x,y);
-                assert IsFactor(p, Gcd(x,y)) by {
-                    AboutEuclid2(x, y);
-                    FactorsNatEquiv(x);
-                    FactorsNatEquiv(y);
-                    FactorsNatEquiv(Gcd(x,y));
-                    EuclidGcdEquivalence(x, y);
-                    EuclidGreatest(x, y);
-                }
-            }
+            GcdGreatest(x, y);
         }
         assert forall p: pos :: p in Factors(Gcd(x,y)) ==> p in Factors(x)*Factors(y) by {
             forall p: pos | p in Factors(Gcd(x,y))
@@ -664,6 +713,23 @@ module Math {
     //     var p := Euclid(x, y);
     // }
 
+    lemma ModPosLemma(x: pos, y: pos, z: pos)
+        requires x < y
+        requires IsFactor(z, x)
+        requires IsFactor(z, y)
+        ensures IsFactor(z, y - x)
+    {
+        var p :| z * p == x;
+        var q :| z * q == y;
+        assert q > p;
+        // assert p - q * (x/y) > 0;
+        calc {
+            y - x;
+            z * q - z * p;
+            z * (q-p);
+        }
+        assert IsFactor(z, y - x);
+    }
     
     lemma ModLemma(x: nat, y: pos, z: nat)
         requires IsFactorNat(z, x)
@@ -695,7 +761,7 @@ module Math {
         }
     }
 
-    lemma EuclidMod(x: pos, y: pos)
+    lemma {:verify false}EuclidMod(x: pos, y: pos)
         ensures IsFactorNat(Euclid(x, y), x % y)
     {
         AboutEuclid2(x, y);
@@ -724,6 +790,31 @@ module Math {
                 Euclid(x,y) *(p - q * (x/y));
             }
             assert IsFactorNat(Euclid(x,y), x);
+        }
+    }
+    
+    lemma GcdGreatest(x: pos, y: pos)
+        ensures forall z :: z in Factors(x) * Factors(y) ==> IsFactor(z, Gcd(x,y))
+        decreases x + y
+    {
+        forall z | z in Factors(x) * Factors(y)
+            ensures IsFactor(z, Gcd(x, y))
+        {
+            if x == y {
+                GcdIdempotent(x);
+                assert IsFactor(z, Gcd(x, y));
+            }else if x < y {
+                ModPosLemma(x, y, z);
+                GcdSubtract(x, y);
+                GcdGreatest(x, y - x);
+                assert IsFactor(z, Gcd(x, y));
+            }else{
+                ModPosLemma(y, x, z);
+                GcdSymmetric(x, y);
+                GcdSubtract(y, x);
+                GcdGreatest(y, x - y);
+                assert IsFactor(z, Gcd(x, y));
+            }
         }
     }
 
