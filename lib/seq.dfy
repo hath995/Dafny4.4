@@ -304,6 +304,14 @@ module SeqCustom {
 
     }
 
+    lemma distinctSlice<A>(list: seq<A>, k: nat)
+        requires distinct(list)
+        requires 0 <= k < |list|
+        ensures distinct(list[k..])
+    {
+
+    }
+
     lemma reverseDistinct<A>(list: seq<A>)
         requires distinct(list)
         ensures distinct(reverse(list))

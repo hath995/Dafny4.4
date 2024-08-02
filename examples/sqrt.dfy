@@ -107,7 +107,7 @@ module SOSqrt {
     method sqrt(val :nat) returns (root:nat)
         ensures val == 0 ==> root == 0
         ensures val == 1 ==> root == 1
-        ensures val != 0 ==> root * root >= val
+        ensures root * root >= val
         ensures val != 0 ==> (root - 1) * (root - 1) < val
         ensures val != 0 ==> forall n : nat :: n < root ==> n*n < val
         ensures IsNatSqrt(root, val)

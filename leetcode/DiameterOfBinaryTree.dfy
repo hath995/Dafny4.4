@@ -895,7 +895,7 @@ lemma TreeHeightToMaxDescTreePath(root: Tree, h: int, end: Tree, path: seq<Tree>
    
 }
 
-lemma  rootPathMaxLeft(root: Tree, start: Tree, end: Tree, path: seq<Tree>, h: int)
+lemma {:induction false} rootPathMaxLeft(root: Tree, start: Tree, end: Tree, path: seq<Tree>, h: int)
     requires root != Nil
     requires root in path
     requires ChildrenAreSeparate(root)
@@ -1264,7 +1264,7 @@ lemma BothCases(root: Tree, left: Tree, right: Tree, h1: int, h2: int)
     requires root.left == left && root.right == right
     requires TreeHeight(root.left) == h1
     requires TreeHeight(root.right) == h2
-    ensures exists start: Tree, end: Tree, path: seq<Tree> :: isTreePath(path, start, end) && |path| == h1+h2 + 3 && isValidPath(path, root) && distinct(path);
+    ensures exists start: Tree, end: Tree, path: seq<Tree> :: root in path && isTreePath(path, start, end) && |path| == h1+h2 + 3 && isValidPath(path, root) && distinct(path);
 {
 
         TreeHeightToDescTreePath(right, h2);
@@ -1299,8 +1299,38 @@ ghost predicate largestPath(path: seq<Tree>, root: Tree) {
     forall start: Tree, end: Tree, paths: seq<Tree> :: distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root) ==> |path| >= |paths|
 }
 
+ghost function allPaths(root: Tree): iset<seq<Tree>> {
+    iset start: Tree, end: Tree, paths: seq<Tree> | distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root) :: paths
+}
+
+ghost function allRootedPaths(root: Tree): iset<seq<Tree>> {
+    iset start: Tree, end: Tree, paths: seq<Tree> | root in paths && distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root) :: paths
+}
+
+lemma pathSums(root: Tree)
+    requires root != Nil
+    requires ChildrenAreSeparate(root)
+    ensures allPaths(root) == allRootedPaths(root)+allPaths(root.left)+allPaths(root.right)
+{
+    forall path | path in allPaths(root)
+        ensures path in allRootedPaths(root)+allPaths(root.left)+allPaths(root.right)
+    {
+        if root in path {
+            assert path in allRootedPaths(root);
+        }else{
+            pathsWithoutRoot(root, path[0], path[|path|-1], path, TreeHeight(root));
+        }
+    }
+
+    forall path | path in allRootedPaths(root)+allPaths(root.left)+allPaths(root.right)
+        ensures path in allPaths(root)
+    {
+        
+    }
+}
+
 ghost predicate largestRootedPath(path: seq<Tree>, root: Tree) {
-    root in path && forall start: Tree, end: Tree, paths: seq<Tree> :: root in paths && distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root) ==> |path| >= |paths|
+    root in path && isPath(path, path[0], path[|path|-1], root) && forall start: Tree, end: Tree, paths: seq<Tree> :: root in paths && distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root) ==> |path| >= |paths|
 }
 
 lemma NullLargest(path: seq<Tree>, root: Tree) 
@@ -1381,36 +1411,182 @@ lemma lpR(root: Tree)
 //How many diameters can be in a tree with n nodes?
 //Count the number of diametes in T?
 
-lemma Largest(root: Tree, h: int, leftPath: seq<Tree>, rightPath: seq<Tree>, leftWidth: int, rightWidth: int, diameter: int, rootPath: seq<Tree>, rootStart: Tree, rootEnd: Tree, rootDim: int, greatestPath: seq<Tree>, start: Tree, end: Tree)
+lemma LargestRootBoth(root: Tree, h: int, 
+leftPath: seq<Tree>, rightPath: seq<Tree>, 
+leftWidth: int, rightWidth: int, 
+diameter: int, rootPath: seq<Tree>, rootDim: int, greatestPath: seq<Tree>, start: Tree, end: Tree)
     requires ChildrenAreSeparate(root)
     requires root != Nil
     requires h == TreeHeight(root)
     requires largestPath(leftPath, root.left)
     requires largestPath(rightPath, root.right)
+    requires largestRootedPath(rootPath, root)
 
-    requires isTreePath(rootPath, rootStart, rootEnd)
-    requires isValidPath(rootPath, root)
     requires distinct(rootPath)
     requires root in rootPath
     requires rootDim == |rootPath|-1
+    requires |rootPath| == 3+TreeHeight(root.right)+TreeHeight(root.left) 
     requires leftWidth == |leftPath| - 1
     requires rightWidth == |rightPath| - 1
-    requires root.left != Nil || root.right != Nil
+    requires root.left != Nil && root.right != Nil
     requires diameter == max(leftWidth, max(rightWidth, TreeHeight(root.left)+TreeHeight(root.right)+2))
-    // requires |greatestPath| == diameter-1
+    requires |greatestPath|-1 == diameter
     requires isTreePath(greatestPath, start,end)
     requires isValidPath(greatestPath, root)
     requires distinct(greatestPath)
     ensures largestPath(greatestPath, root)
 {
+    pathSums(root);
     forall start: Tree, end: Tree, paths: seq<Tree> | distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root)
         ensures |greatestPath| >= |paths|
     {
+        if diameter == leftWidth {
+            // assert leftWidth >= rightWidth;
+            // assert leftWidth >= TreeHeight(root.left)+TreeHeight(root.right)+2;
+            // assert |leftPath| == |greatestPath|;
+            // assert |leftPath| >= |rightPath|;
+            // rootPathMax(root, rootPath[0], rootPath[|rootPath|-1], rootPath, h);
+            // assert |leftPath| >= |rootPath|;
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+        } else if diameter == rightWidth {
+            // assert |rightPath| == |greatestPath|;
+            // assert |rightPath| >= |leftPath|;
+            // rootPathMax(root, rootPath[0], rootPath[|rootPath|-1], rootPath, h);
+            // assert |rightPath| >= |rootPath|;
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+
+        } else if diameter == TreeHeight(root.left)+TreeHeight(root.right)+2 {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+        }
         //if root in path then pathOptions
         //if root !in path ==> path in rootRight or path in rootLeft
     }
 }
 
+lemma LargestRootLeft(root: Tree, h: int, 
+leftPath: seq<Tree>, rightPath: seq<Tree>, 
+leftWidth: int, rightWidth: int, 
+diameter: int, rootPath: seq<Tree>, rootDim: int, greatestPath: seq<Tree>, start: Tree, end: Tree)
+    requires ChildrenAreSeparate(root)
+    requires root != Nil
+    requires h == TreeHeight(root)
+    requires largestPath(leftPath, root.left)
+    requires largestPath(rightPath, root.right)
+    requires largestRootedPath(rootPath, root)
+
+    requires distinct(rootPath)
+    requires root in rootPath
+    requires rootDim == |rootPath|-1
+    requires |rootPath| == 1+TreeHeight(root) 
+    requires leftWidth == |leftPath| - 1
+    requires rightWidth == |rightPath| - 1
+    requires root.left != Nil && root.right == Nil
+    requires diameter == max(leftWidth, max(rightWidth, TreeHeight(root.left)+TreeHeight(root.right)+2))
+    requires |greatestPath|-1 == diameter
+    requires isTreePath(greatestPath, start,end)
+    requires isValidPath(greatestPath, root)
+    requires distinct(greatestPath)
+    ensures largestPath(greatestPath, root)
+{
+    pathSums(root);
+    forall start: Tree, end: Tree, paths: seq<Tree> | distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root)
+        ensures |greatestPath| >= |paths|
+    {
+        if diameter == leftWidth {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+        } else if diameter == rightWidth {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+
+        } else if diameter == TreeHeight(root.left)+TreeHeight(root.right)+2 {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+        }
+    }
+}
+
+lemma LargestRootRight(root: Tree, h: int, 
+leftPath: seq<Tree>, rightPath: seq<Tree>, 
+leftWidth: int, rightWidth: int, 
+diameter: int, rootPath: seq<Tree>, rootDim: int, greatestPath: seq<Tree>, start: Tree, end: Tree)
+    requires ChildrenAreSeparate(root)
+    requires root != Nil
+    requires h == TreeHeight(root)
+    requires largestPath(leftPath, root.left)
+    requires largestPath(rightPath, root.right)
+    requires largestRootedPath(rootPath, root)
+
+    requires distinct(rootPath)
+    requires root in rootPath
+    requires rootDim == |rootPath|-1
+    requires |rootPath| == 1+TreeHeight(root) 
+    requires leftWidth == |leftPath| - 1
+    requires rightWidth == |rightPath| - 1
+    requires root.left == Nil && root.right != Nil
+    requires diameter == max(leftWidth, max(rightWidth, TreeHeight(root.left)+TreeHeight(root.right)+2))
+    requires |greatestPath|-1 == diameter
+    requires isTreePath(greatestPath, start,end)
+    requires isValidPath(greatestPath, root)
+    requires distinct(greatestPath)
+    ensures largestPath(greatestPath, root)
+{
+    pathSums(root);
+    forall start: Tree, end: Tree, paths: seq<Tree> | distinct(paths) && isTreePath(paths, start, end) && isValidPath(paths, root)
+        ensures |greatestPath| >= |paths|
+    {
+        if diameter == leftWidth {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+        } else if diameter == rightWidth {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+
+        } else if diameter == TreeHeight(root.left)+TreeHeight(root.right)+2 {
+            if root in paths {
+
+            }else{
+                pathsWithoutRoot(root, start, end, paths, h);
+            }
+            assert |greatestPath| >= |paths|;
+        }
+    }
+}
 
 
 method diameter(root: Tree) returns (heightDim: (int, int))
@@ -1437,13 +1613,16 @@ method diameter(root: Tree) returns (heightDim: (int, int))
 
     if root.right != Nil && root.left != Nil {
         BothCases(root, root.left, root.right, leftDiameter.0, rightDiameter.0);
-        ghost var rstart: Tree, rend: Tree, rightPath: seq<Tree> :| isTreePath(rightPath, rstart, rend) && |rightPath| - 1 == rightDiameter.1;
-        ghost var lstart: Tree, lend: Tree, leftPath: seq<Tree> :| isTreePath(leftPath, lstart, lend) && |leftPath| - 1 == leftDiameter.1;
-        ghost var start, end, path :| isTreePath(path, start, end) && |path| == leftDiameter.0 + rightDiameter.0 + 3 && isValidPath(path, root) && distinct(path);
+        ghost var rstart: Tree, rend: Tree, rightPath: seq<Tree> :| isTreePath(rightPath, rstart, rend) && |rightPath| - 1 == rightDiameter.1 && isValidPath(rightPath, root) && distinct(rightPath) && largestPath(rightPath, root.right);
+        ghost var lstart: Tree, lend: Tree, leftPath: seq<Tree> :| isTreePath(leftPath, lstart, lend) && |leftPath| - 1 == leftDiameter.1 && isValidPath(leftPath, root) && distinct(leftPath) && largestPath(leftPath, root.left);
+        ghost var start, end, path :| root in path && isTreePath(path, start, end) && |path| == leftDiameter.0 + rightDiameter.0 + 3 && isValidPath(path, root) && distinct(path);
+        rootPathMax(root, start, end, path, TreeHeight(root));
         if leftDiameter.1 > max(rightDiameter.1, dim) {
             assert maxDiameter == leftDiameter.1;
             // assert largestPath(leftPath, root.right);
+            LargestRootBoth(root, TreeHeight(root), leftPath, rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, path, dim, leftPath, lstart, lend);
         }else if rightDiameter.1 > dim {
+            LargestRootBoth(root, TreeHeight(root), leftPath, rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, path, dim, rightPath, rstart, rend);
             assert maxDiameter == rightDiameter.1;
         }else{
             assert |path| >= |rightPath|;
@@ -1452,8 +1631,8 @@ method diameter(root: Tree) returns (heightDim: (int, int))
             assert dim >= leftDiameter.1;
             assert |path| - 1 == dim;
             assert maxDiameter == dim;
+            LargestRootBoth(root, TreeHeight(root), leftPath, rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, path, dim, path, start, end);
         }
-        // Largest(root, TreeHeight(root), leftPath, rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, path, start, end);
     } else if root.right != Nil {
         ghost var rstart: Tree, rend: Tree, rightPath: seq<Tree> :| isTreePath(rightPath, rstart, rend) && |rightPath| - 1 == rightDiameter.1 && isValidPath(rightPath, root) && distinct(rightPath) && largestPath(rightPath, root.right);
         TreeHeightToDescTreePath(root.right, rightDiameter.0);
@@ -1466,11 +1645,16 @@ method diameter(root: Tree) returns (heightDim: (int, int))
         assert leftDiameter.0 == -1;
         assert leftDiameter.1 == -1;
         NullLargest([], root.left);
+        rootPathMax(root, root, end, [root]+rpath, TreeHeight(root));
         if leftDiameter.1 > max(rightDiameter.1, dim) {
             assert false;
         }else if rightDiameter.1 > dim {
             assert maxDiameter == rightDiameter.1;
-            // Largest(root, TreeHeight(root), [], rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, rightPath, rstart, rend);
+            assert TreeHeight(root.right)+1 == TreeHeight(root);
+            assert |rpath| == TreeHeight(root.right)+1;
+            assert |[root]+rpath| == TreeHeight(root.right)+2;
+         
+            LargestRootRight(root, TreeHeight(root), [], rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, [root]+rpath, dim, rightPath, rstart, rend);
         }else{
             assert dim >= rightDiameter.1;
             assert dim >= leftDiameter.1;
@@ -1482,7 +1666,8 @@ method diameter(root: Tree) returns (heightDim: (int, int))
             }
             assert maxDiameter == dim;
             assert |[root]+rpath| - 1 == dim;
-            // Largest(root, TreeHeight(root), [], rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, [root]+rpath, root, end);
+            rootPathMax(root, root, end, [root]+rpath, TreeHeight(root));
+            LargestRootRight(root, TreeHeight(root), [], rightPath, leftDiameter.1, rightDiameter.1, maxDiameter, [root]+rpath, dim, [root]+rpath, root, end);
         }
     } else if root.left != Nil {
         ghost var lstart: Tree, lend: Tree, leftPath: seq<Tree> :| isTreePath(leftPath, lstart, lend) && |leftPath| - 1 == leftDiameter.1 && isValidPath(leftPath, root.left) && distinct(leftPath) && largestPath(leftPath, root.left);
@@ -1497,8 +1682,10 @@ method diameter(root: Tree) returns (heightDim: (int, int))
         assert rightDiameter.1 == -1;
         assert leftDiameter.1 >= 0;
         NullLargest([], root.right);
+        rootPathMax(root, root, end, [root]+lpath, TreeHeight(root));
         if leftDiameter.1 > max(rightDiameter.1, dim) {
             assert maxDiameter == leftDiameter.1;
+            LargestRootLeft(root, TreeHeight(root), leftPath, [], leftDiameter.1, rightDiameter.1, maxDiameter, [root]+lpath, dim, leftPath, lstart, lend);
             // Largest(root, TreeHeight(root), leftPath, [], leftDiameter.1, rightDiameter.1, maxDiameter, leftPath, lstart, lend);
         }else if rightDiameter.1 > dim {
             assert false;
@@ -1506,8 +1693,10 @@ method diameter(root: Tree) returns (heightDim: (int, int))
             assert dim >= rightDiameter.1;
             assert dim >= leftDiameter.1;
             assert maxDiameter == dim;
+            LargestRootLeft(root, TreeHeight(root), leftPath, [], leftDiameter.1, rightDiameter.1, maxDiameter, [root]+lpath, dim, [root]+lpath, root, end);
             // Largest(root, TreeHeight(root), leftPath, [], leftDiameter.1, rightDiameter.1, maxDiameter, [root]+lpath, root, end);
         }
+
     }
 
     return (height, maxDiameter);
