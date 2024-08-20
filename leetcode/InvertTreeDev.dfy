@@ -155,7 +155,7 @@ module InvertTreeDev {
                 return 1;
             }else{
                 // assert PreorderTraversal(root) == [root]+PreorderTraversal(root.left)+PreorderTraversal(root.right);
-                assert PreorderTraversal(node) == PreorderTraversal(root)[(1+|PreorderTraversal(root.left)|)..|PreorderTraversal(root.left)|+|PreorderTraversal(root.right)|+1];
+                // assert PreorderTraversal(node) == PreorderTraversal(root)[(1+|PreorderTraversal(root.left)|)..|PreorderTraversal(root.left)|+|PreorderTraversal(root.right)|+1];
                 // assert 0 <= 1+|PreorderTraversal(root.left)| < |PreorderTraversal(root)|;
                 return 1+|PreorderTraversal(root.left)|;
             }
@@ -165,21 +165,21 @@ module InvertTreeDev {
                 assert false;
             } else if root.right != null && root.left == null {
                 assert node in root.right.repr;
-                assert root.right.Valid();
-                PreorderTraversalSlices(root.right);
+                // assert root.right.Valid();
+                // PreorderTraversalSlices(root.right);
                 var x := PreorderTraversalSubSlices2(root.right, node);
                 sliceSlice(PreorderTraversal(root), PreorderTraversal(root.right), PreorderTraversal(node), 1, x);
-                assert PreorderTraversal(root)[1+x..|PreorderTraversal(node)|+1+x] == PreorderTraversal(node);
+                // assert PreorderTraversal(root)[1+x..|PreorderTraversal(node)|+1+x] == PreorderTraversal(node);
                 // assert 1+x < |PreorderTraversal(root)|;
                 // assert |PreorderTraversal(node)|+1+x <= |PreorderTraversal(root)|;
                 return 1+x;
             } else if root.right == null && root.left != null {
                 assert node in root.left.repr;
-                assert root.left.Valid();
-                PreorderTraversalSlices(root.left);
+                // assert root.left.Valid();
+                // PreorderTraversalSlices(root.left);
                 var x:= PreorderTraversalSubSlices2(root.left, node);
                 sliceSlice(PreorderTraversal(root), PreorderTraversal(root.left), PreorderTraversal(node), 1, x);
-                assert PreorderTraversal(root)[1+x..1+|PreorderTraversal(node)|+x] == PreorderTraversal(node);
+                // assert PreorderTraversal(root)[1+x..1+|PreorderTraversal(node)|+x] == PreorderTraversal(node);
                 // assert |PreorderTraversal(node)|+1+x <= |PreorderTraversal(root)|;
                 // assert 0 <= 1+x < |PreorderTraversal(root)|;
                 return 1+x;
@@ -188,9 +188,9 @@ module InvertTreeDev {
                 // assert |PreorderTraversal(root)| == 1+ |PreorderTraversal(root.left)|+|PreorderTraversal(root.right)|;
                 if node in root.right.repr {
                     // PreorderTraversalSlices(root);
-                    assert root.right.Valid();
+                    // assert root.right.Valid();
                     var x := PreorderTraversalSubSlices2(root.right, node);
-                    assert PreorderTraversal(node) == PreorderTraversal(root.right)[x..|PreorderTraversal(node)|+x];
+                    // assert PreorderTraversal(node) == PreorderTraversal(root.right)[x..|PreorderTraversal(node)|+x];
                     var y := |PreorderTraversal(root.left)|+1;
                     // assert 0 <= y+x < |PreorderTraversal(root)|;
                     // assert y+x+|PreorderTraversal(node)| <= |PreorderTraversal(root)|;
@@ -198,13 +198,13 @@ module InvertTreeDev {
                     return y+x;
                 }else if node in root.left.repr {
                     // PreorderTraversalSlices(root);
-                    assert root.left.Valid();
+                    // assert root.left.Valid();
                     var x:= PreorderTraversalSubSlices2(root.left, node);
                     // assert 0 <= x < |PreorderTraversal(root.left)|;
-                    assert x+1 < |PreorderTraversal(root)|;
-                    assert 1 <= 1+x;
-                    assert PreorderTraversal(node) == PreorderTraversal(root.left)[x..|PreorderTraversal(node)|+x];
-                    assert PreorderTraversal(root)[1+x..1+|PreorderTraversal(node)|+x] == PreorderTraversal(node);
+                    // assert x+1 < |PreorderTraversal(root)|;
+                    // assert 1 <= 1+x;
+                    // assert PreorderTraversal(node) == PreorderTraversal(root.left)[x..|PreorderTraversal(node)|+x];
+                    // assert PreorderTraversal(root)[1+x..1+|PreorderTraversal(node)|+x] == PreorderTraversal(node);
                     // assert |PreorderTraversal(node)|+1+x <= |PreorderTraversal(root)|;
                     return 1+x;
                 }else{
