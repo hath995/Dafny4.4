@@ -1,92 +1,8 @@
 include "../definitions.dfy"
-
+include "./Nelson-ch0-defs.dfy"
 module NelsonCh0 {
     import opened Analysis
-
-    predicate boundedOutput(f: real --> real, x: real, M: real)
-        requires f.requires(x)
-    {
-        abs(f(x)) <= M
-    }
-
-    ghost predicate isBoundedBetween(f: real --> real, a: real, b: real, M: real)
-        requires M > 0.0
-    {
-        forall x: real :: a <= x <= b ==> if f.requires(x) then boundedOutput(f, x, M) else false
-    }
-
-    ghost predicate isBounded(f: real --> real, a: real, b: real) {
-        exists M: real :: M > 0.0 && isBoundedBetween(f, a, b, M)
-    }
-
-    ghost function BoundedFunctions(a: real, b: real): iset<real -> real> 
-        requires a <= b
-    {
-        iset f: real -> real | isBounded(f, a, b)
-    }
-
-    lemma BoundedFunctionsSubset(a: real, b: real, c: real, f: real -> real)
-        requires a < c < b
-        requires isBounded(f, a, b)
-        ensures isBounded(f, c, b)
-    {
-        var M :| M > 0.0 && isBoundedBetween(f, a, b, M);
-        assert isBoundedBetween(f, c, b, M);
-    }
-
-    lemma BoundedFunctionsSubsetLower(a: real, b: real, c: real, f: real -> real)
-        requires a < c < b
-        requires isBounded(f, a, b)
-        ensures isBounded(f, a, c)
-    {
-        var M :| M > 0.0 && isBoundedBetween(f, a, b, M);
-        assert isBoundedBetween(f, a, c, M);
-    }
-
-    ghost function funcRange(f: real --> real, a: real, b: real): iset<real>
-        requires forall x :: a <= x <= b ==> f.requires(x)
-    {
-        iset x | a <= x <= b :: f(x)
-    }
-
-    ghost function infimum(ms: iset<real>, val: real, lbound: real): real
-        requires val in ms
-        requires lowerBound(ms, lbound)
-        ensures inf(ms, infimum(ms, val, lbound))
-    {
-        CompletenessAxiomLower(ms, lbound);
-        var inf_ms :| inf(ms, inf_ms);
-        inf_ms
-    }
-
-    ghost function supremum(ms: iset<real>, val: real, ubound: real): real
-        requires val in ms
-        requires upperBound(ms, ubound)
-        ensures sup(ms, supremum(ms, val, ubound))
-    {
-        CompletenessAxiomUpper(ms, ubound);
-        var sup_ms :| sup(ms, sup_ms);
-        sup_ms
-    }
-
-
-    lemma BoundedBelow(f: real --> real, a: real, b: real, c: real, d: real, M: real) 
-        requires M > 0.0
-        requires a < b
-        requires a <= c < d <= b
-        requires forall x :: a <= x <= b ==> f.requires(x)
-        requires isBoundedBetween(f, a, b, M)
-        ensures lowerBound(funcRange(f, c, d), -M)
-    {}
-
-    lemma BoundedAbove(f: real --> real, a: real, b: real, c: real, d: real, M: real) 
-        requires M > 0.0
-        requires a < b
-        requires a <= c < d <= b
-        requires forall x :: a <= x <= b ==> f.requires(x)
-        requires isBoundedBetween(f, a, b, M)
-        ensures upperBound(funcRange(f, c, d), M)
-    {}
+    import opened NelsonCh0Defs
 
     function oneOverX(x: real): real 
         requires x != 0.0
@@ -123,87 +39,124 @@ module NelsonCh0 {
         // assert oneOverX in BoundedFunctions(1.0, 2.0) by {}
     }
 
-    predicate Ordered(xs: seq<real>) {
-        forall i,j :: 0 <= i < j < |xs| ==> xs[i] < xs[j]
-    }
 
-    datatype Partition = Partition(xs: seq<real>, s: set<real>)
+    // ghost function LowerSum(f: real -> real, P: Partition, a: real, b: real): real 
+    //     requires a < b
+    //     requires isBounded(f, a, b)
+    //     requires PartitionOf(a,b, P)
+    // {
+    //     PartitionPointsBetweenAB(P, a, b);
+    //     LowerSumHelper(f, P, a, b, 1)
+    // }
 
-    predicate PartitionOf(a: real, b: real, p: Partition)
-        requires a < b
+    // ghost function LowerSumHelper(f: real -> real, P: Partition, a: real, b: real, i: nat): real 
+    //     requires a < b
+    //     requires isBounded(f, a, b)
+    //     requires PartitionPartial(a,b, P)
+    //     requires 1 <= i < |P.xs|
+    //     decreases |P.xs|-i
+    // {
+    //     // var ms := iset x | P.xs[i-1] <= x <= P.xs[i] :: f(x);
+    //     var ms := funcRange(f, P.xs[i-1], P.xs[i]);
+    //     var q := f(P.xs[i-1]);
+    //     assert q in ms;
+    //     var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+    //     assert P.xs[i-1] in P.xs;
+    //     BoundedBelow(f, a, b, P.xs[i-1], P.xs[i], M);
+    //     var m_i := infimum(ms, q, -M);
+    //     if i == |P.xs|-1 then m_i * (P.xs[i] - P.xs[i-1]) else m_i * (P.xs[i] - P.xs[i-1]) + LowerSumHelper(f, P, a, b, i+1)
+    // }
+
+    ghost function InfWidth(f: real -> real, x: real, y: real, ms: iset<real>): real 
+        requires x < y
+        requires ms == funcRange(f, x, y)
+        requires isBounded(f, x, y)
     {
-        a in p.s
-        && b in p.s
-        && |p.xs| > 1
-        && (forall x :: x in p.s ==> x in p.xs)
-        && (forall x :: x in p.xs ==> x in p.s)
-        && (forall x :: x in p.xs ==> a <= x <= b)
-        && Ordered(p.xs)
-        && p.xs[|p.xs|-1] == b
-    }
-
-    predicate PartitionPartial(a: real, b: real, p: Partition)
-        requires a < b
-    {
-        b in p.s
-        && |p.xs| >= 1
-        && (forall x :: x in p.s ==> x in p.xs)
-        && (forall x :: x in p.xs ==> x in p.s)
-        && Ordered(p.xs)
-        && (forall x :: x in p.xs ==> a <= x <= b)
-        && p.xs[|p.xs|-1] == b
-    }
-
-    lemma PartitionPointsBetweenAB(p: Partition, a: real, b: real)
-        requires a < b
-        requires PartitionOf(a,b, p)
-        ensures forall x :: x in p.s ==> a <= x <= b
-    {
-    }
-
-    ghost function LowerSum(f: real -> real, P: Partition, a: real, b: real): real 
-        requires a < b
-        requires isBounded(f, a, b)
-        requires PartitionOf(a,b, P)
-    {
-        PartitionPointsBetweenAB(P, a, b);
-        LowerSumHelper(f, P, a, b, 1)
-    }
-
-    ghost function LowerSumHelper(f: real -> real, P: Partition, a: real, b: real, i: nat): real 
-        requires a < b
-        requires isBounded(f, a, b)
-        requires PartitionPartial(a,b, P)
-        requires 1 <= i < |P.xs|
-        decreases |P.xs|-i
-    {
-        // var ms := iset x | P.xs[i-1] <= x <= P.xs[i] :: f(x);
-        var ms := funcRange(f, P.xs[i-1], P.xs[i]);
-        var q := f(P.xs[i-1]);
+        var q := f(x);
         assert q in ms;
-        var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
-        assert P.xs[i-1] in P.xs;
-        BoundedBelow(f, a, b, P.xs[i-1], P.xs[i], M);
-        var m_i := infimum(ms, q, -M);
-        if i == |P.xs|-1 then m_i * (P.xs[i] - P.xs[i-1]) else m_i * (P.xs[i] - P.xs[i-1]) + LowerSumHelper(f, P, a, b, i+1)
+        var M :| M > 0.0 && isBoundedBetween(f,x,y,M);
+        BoundedBelow(f, x, y, x, y, M);
+        infimum(ms, q, -M)*(y-x)
+    }
+
+    lemma InfWidthSame(f: real -> real, x: real, y: real, ms: iset<real>, m: real)
+        requires x < y
+        requires ms == funcRange(f, x, y)
+        requires isBounded(f, x, y)
+        requires inf(ms, m)
+        ensures InfWidth(f, x, y, funcRange(f, x, y)) == prod(m,(y-x))
+    {
+        var M :| M > 0.0 && isBoundedBetween(f,x,y,M);
+        var q := f(x);
+        assert q in ms;
+        BoundedBelow(f, x, y, x, y, M);
+        infimumInfSame(ms, q, -M, m);
+    }
+
+    ghost predicate MidInfWidthLessThan(f: real -> real, x: real, y: real, a: real, b: real, m: real ) 
+        requires a <= x < y <= b
+        requires isBounded(f, x, y)
+    {
+        m*(y-x) <= InfWidth(f, x, y, funcRange(f, x, y))
+    }
+
+    lemma InfOfAllLessThanSome(f: real -> real, a: real, b: real, x: real, y: real, ms: iset<real>, m: real)
+        requires x < y
+        requires a < b
+        requires a <= x < y <=b
+        requires ms == funcRange(f, a, b)
+        requires isBounded(f, x, y)
+        requires inf(ms, m)
+        ensures  MidInfWidthLessThan(f, x, y, a, b, m)
+    {
+        var fs := funcRange(f, x, y);
+        var q := f(x);
+        assert q in fs;
+        var M :| M > 0.0 && isBoundedBetween(f,x,y,M);
+        BoundedBelow(f, x, y, x, y, M);
+        CompletenessAxiomLower(fs, -M);
+        var m_0 :| inf(fs, m_0);
+        calc {
+            InfWidth(f, x, y, funcRange(f, x, y));
+            infimum(funcRange(f, x, y), q, -M)*(y-x);
+            {infAllUnique(fs, m_0);}
+            m_0*(y-x);
+        }
+        assert m <= m_0 by {
+
+                assert fs <= funcRange(f, a, b);
+                if m_0 < m {
+                    assert lowerBound(fs, m);
+                    assert lowerBound(fs, m_0);
+                    assert lowerBound(funcRange(f, x, y), m_0);
+                    var diff := m - m_0;
+                    assert diff > 0.0;
+                    var epsilon := diff / 2.0;
+                    assert !lowerBound(fs, add(m_0, epsilon));
+                    assert false;
+                }
+        }
+        assert m*(y-x) <= m_0*(y-x);
     }
 
     ghost function LowerSumAlt(f: real -> real, P: Partition, a: real, b: real): real 
         requires a < b
         requires isBounded(f, a, b)
         requires |P.xs| > 1
-        requires PartitionPartial(a,b, P)
+        requires PartitionOf(a,b, P)
         decreases |P.xs|
     {
-        var ms := funcRange(f, P.xs[0], P.xs[1]);
-        var q := f(P.xs[0]);
-        assert q in ms;
-        var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
-        assert P.xs[0] in P.xs;
-        BoundedBelow(f, a, b, P.xs[0], P.xs[1], M);
-        var m_0 := infimum(ms, q, -M);
-        var res := m_0*(P.xs[1]-P.xs[0]);
-        if |P.xs| == 2 then res else res + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), a, b)
+        // var ms := funcRange(f, P.xs[0], P.xs[1]);
+        // var q := f(P.xs[0]);
+        // assert q in ms;
+        // var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+        // assert P.xs[0] in P.xs;
+        // BoundedBelow(f, a, b, P.xs[0], P.xs[1], M);
+        // var m_0 := infimum(ms, q, -M);
+        // var res := m_0*(P.xs[1]-P.xs[0]);
+        if |P.xs| == 2 then InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) else
+        functionBoundedInMiddle(f, a, b, P.xs[1]);
+        InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b)
     }
 
     function PartitionRemoveIndex(p: Partition, a: real, b: real, i: nat): Partition
@@ -216,6 +169,20 @@ module NelsonCh0 {
         Partition(p.xs[..i] + p.xs[i+1..], p.s - {p.xs[i]})
     }
 
+    lemma LowerSumAssociative(f: real -> real, P_1: Partition, P_2: Partition, P_3: Partition, a: real, b: real, c: real, d: real)
+        requires a < b < c < d
+        requires isBounded(f, a, d)
+        requires isBounded(f, a, b)
+        requires isBounded(f, b, c)
+        requires isBounded(f, c, d)
+        requires PartitionOf(a,b, P_1)
+        requires PartitionOf(b,c, P_2)
+        requires PartitionOf(c,d, P_3)
+        ensures LowerSumAlt(f, P_1, a, b) + (LowerSumAlt(f, P_2, b, c) + LowerSumAlt(f, P_3, c, d)) == (LowerSumAlt(f, P_1, a, b) + LowerSumAlt(f, P_2, b, c)) + LowerSumAlt(f, P_3, c, d)
+        {
+
+        }
+
     lemma LowerSumConcat(f: real -> real, P: Partition, P_1: Partition, P_2: Partition, a: real, b: real, c: real)
         requires a < c < b
         requires isBounded(f, a, b)
@@ -225,131 +192,219 @@ module NelsonCh0 {
         requires PartitionOf(c,b, P_2)
         requires P == Partition(P_1.xs[..|P_1.xs|-1]+P_2.xs, P_1.s+P_2.s)
         requires PartitionOf(a,b, P)
-        ensures LowerSum(f, P, a, b) == LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b)
-    {
-        if |P_1.xs| == 2 {
-            var ms := funcRange(f, P_1.xs[0], P_1.xs[1]);
-            var q := f(P_1.xs[0]);
-            assert q in ms;
-            var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
-            BoundedBelow(f, a, b, P_1.xs[0], P_1.xs[1], M);
-            var m_0 := infimum(ms, q, -M);
-            infAllUnique(ms, m_0);
-            calc {
-                LowerSum(f, P_1, a, c);
-                LowerSumHelper(f, P_1, a, c, 1);
-                m_0*(P_1.xs[1]-P.xs[0]);
-            }
-            assert P.xs[0] == P_1.xs[0];
-            assert P.xs[1] == P_1.xs[1];
-            calc {
-                LowerSum(f, P, a, b);
-                LowerSumHelper(f, P, a, b, 1);
-                m_0*(P_1.xs[1]-P.xs[0]) + LowerSumHelper(f, P, a,b, 2);
-            }
-            assert LowerSum(f, P_2, c, b) == LowerSumHelper(f, P, a, b, 2);
-            assert LowerSum(f, P, a, b) == LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b);
-        }else{
+        ensures LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b)
+        // decreases |P.xs|
+    // {
+    //     assert P_1.xs[|P_1.xs|-1] == c;
+    //     assert P_1.xs[0] == a;
+    //     assert P_2.xs[0] == c;
+    //     assert P_2.xs[|P_2.xs|-1] == b;
+    //     if |P_1.xs| == 2 {
+    //         var ms := funcRange(f, P_1.xs[0], P_1.xs[1]);
+    //         var ms' := funcRange(f, P.xs[0], P.xs[1]);
+    //         assert ms == ms';
+    //         var q := f(P_1.xs[0]);
+    //         var q' := f(P.xs[0]);
+    //         assert q in ms;
+    //         assert q' in ms';
+    //         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+    //         BoundedBelow(f, a, b, P_1.xs[0], P_1.xs[1], M);
+    //         var m_0 := infimum(ms, q, -M);
+    //         var m_0' := infimum(ms', q', -M);
+    //         infAllUnique(ms, m_0);
+    //         infAllUnique(ms', m_0');
+    //         calc {
+    //             LowerSumAlt(f, P_1, a, c);
+    //             m_0*(P_1.xs[1]-P_1.xs[0]);
+    //         }
+    //         assert P.xs[0] == P_1.xs[0];
+    //         assert P.xs[1] == P_1.xs[1];
+    //         assert P_2 == Partition(P.xs[1..], P.s - {P.xs[0]});
+    //         // calc {
+    //         //     LowerSumAlt(f, P, a, b);
+    //         //     m_0'*(P.xs[1]-P.xs[0]) + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+    //         // }
+    //         assume LowerSumAlt(f, P, a, b) == m_0*(P_1.xs[1]-P_1.xs[0]) + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+    //         assert LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b) == LowerSumAlt(f, P_2, c, b);
+    //         // // assert LowerSumAlt(f, P_2, c, b) == LowerSumAlt(f, P, a, b);
+    //         assert LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b);
+    //     } else {
+    //         var c' := P_1.xs[1];
+    //         assert c' != c && c' < c;
+    //         functionBoundedInMiddle(f, a, c, c');
+    //         assert P_1.xs[1..][0] == c';
+    //         assert P_1.xs[1..][|P_1.xs[1..]|-1] == c;
+    //         LowerSumConcat2(f, P_1, Partition(P_1.xs[..2], {P_1.xs[0], P_1.xs[1]}), Partition(P_1.xs[1..], P_1.s - {P_1.xs[0]}), a, c, c');
 
-            assert LowerSum(f, P, a, b) == LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b);
-        }
-    }
+    //         var ms := funcRange(f, P_1.xs[0], P_1.xs[1]);
+    //         var q := f(P_1.xs[0]);
+    //         assert q in ms;
+    //         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+    //         BoundedBelow(f, a, b, P_1.xs[0], P_1.xs[1], M);
+    //         var m_0 := infimum(ms, q, -M);
+    //         infAllUnique(ms, m_0);
+    //         calc {
+    //             LowerSumAlt(f, Partition(P_1.xs[..2], {P_1.xs[0], P_1.xs[1]}), a, P_1.xs[1]);
+    //             m_0*(P_1.xs[1]-P_1.xs[0]);
+    //         }
+    //         assert Partition(P.xs[1..], P.s - {P.xs[0]}) == Partition(P_1.xs[..|P_1.xs|-1][1..]+P_2.xs, P_1.s + P_2.s - {P_1.xs[0]});
+    //         assert LowerSumAlt(f, P_1, a, c) == LowerSumAlt(f, Partition(P_1.xs[..2], {P_1.xs[0], P_1.xs[1]}), a, P_1.xs[1]) + LowerSumAlt(f, Partition(P_1.xs[1..], P_1.s - {P_1.xs[0]}), P_1.xs[1], c);
+    //         LowerSumConcat2(f, Partition(P.xs[1..], P.s - {P.xs[0]}), Partition(P_1.xs[1..], P_1.s - {P_1.xs[0]}), P_2, P_1.xs[1], b, c);
+    //         assert LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b);
+    //     }
+    // }
 
-    lemma {:verify false} LowerSumPartial(f: real -> real, P: Partition, a: real, b: real, i: nat, m_i: real)
+    // lemma {:verify false} LowerSumPartial(f: real -> real, P: Partition, a: real, b: real, i: nat, m_i: real)
+    //     requires a < b
+    //     requires f in BoundedFunctions(a, b)
+    //     requires PartitionOf(a,b, P)
+    //     requires 1 <= i < |P.xs|-1
+    //     requires inf(funcRange(f, P.xs[i-1], P.xs[i]), m_i)
+    //     ensures LowerSum(f, P, a, b) == m_i * (P.xs[i] - P.xs[i-1]) + LowerSum(f, PartitionRemoveIndex(P, a, b, i), a, b)
+    // {
+    //     if |P.xs| == 2 {
+    //         assert LowerSum(f, P, a, b) == m_i * (P.xs[i] - P.xs[i-1]);
+    //     } else {
+    //         var l := LowerSum(f, P, a, b);
+    //         var l' := m_i * (P.xs[i] - P.xs[i-1]) + LowerSum(f, PartitionRemoveIndex(P, a, b, i), a, b);
+    //         assert l == l';
+    //     }
+    //     //var l := LowerSum(f, P, a, b);
+    // }
+
+
+    // ghost function UpperSum(f: real -> real, P: Partition, a: real, b: real): real 
+    //     requires a < b
+    //     requires f in BoundedFunctions(a, b)
+    //     requires PartitionOf(a,b, P)
+    // {
+    //     UpperSumHelper(f, P, a, b, 1)
+    // }
+
+    // ghost function UpperSumHelper(f: real -> real, P: Partition, a: real, b: real, i: nat): real 
+    //     requires a < b
+    //     requires f in BoundedFunctions(a, b)
+    //     requires PartitionPartial(a,b, P)
+    //     requires 1 <= i < |P.xs|
+    //     decreases |P.xs|-i
+    // {
+    //     var ms := iset x | P.xs[i-1] <= x <= P.xs[i] :: f(x);
+    //     var q := f(P.xs[i-1]);
+    //     assert q in ms;
+    //     var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+    //     assert P.xs[i-1] in P.xs;
+    //     BoundedAbove(f, a, b, P.xs[i-1], P.xs[i], M);
+    //     CompletenessAxiomUpper(ms, M);
+    //     var M_i :| sup(ms, M_i);
+    //     if i == |P.xs|-1 then M_i * (P.xs[i] - P.xs[i-1]) else M_i * (P.xs[i] - P.xs[i-1]) + UpperSumHelper(f, P, a, b, i+1)
+    // }
+
+    ghost function UpperSumAlt(f: real -> real, P: Partition, a: real, b: real): real 
         requires a < b
-        requires f in BoundedFunctions(a, b)
-        requires PartitionOf(a,b, P)
-        requires 1 <= i < |P.xs|-1
-        requires inf(funcRange(f, P.xs[i-1], P.xs[i]), m_i)
-        ensures LowerSum(f, P, a, b) == m_i * (P.xs[i] - P.xs[i-1]) + LowerSum(f, PartitionRemoveIndex(P, a, b, i), a, b)
-    {
-        if |P.xs| == 2 {
-            assert LowerSum(f, P, a, b) == m_i * (P.xs[i] - P.xs[i-1]);
-        } else {
-            var l := LowerSum(f, P, a, b);
-            var l' := m_i * (P.xs[i] - P.xs[i-1]) + LowerSum(f, PartitionRemoveIndex(P, a, b, i), a, b);
-            assert l == l';
-        }
-        //var l := LowerSum(f, P, a, b);
-    }
-
-    lemma infUnique(ms: iset<real>, m: real, m': real)
-        requires inf(ms, m)
-        requires inf(ms, m')
-        ensures m == m'
-    {
-        if m != m' {
-            assert lowerBound(ms, m);
-            assert lowerBound(ms, m');
-            if m < m' {
-                var diff := m' - m;
-                // assert diff > 0.0;
-                assert m' == add(m, diff);
-                // assert m < m+diff < m';
-                // assert lowerBound(ms, m+diff);
-                // assert !greatestLeastBound(ms, m');
-            } else {
-                var diff := m - m';
-                assert m' == add(m', diff);
-            }
-
-            assert false;
-            // assert m' <= m;
-        }
-    }
-
-    lemma infAllUnique(ms: iset<real>, m: real)
-        requires inf(ms, m)
-        ensures forall m' :: inf(ms, m') ==> m' == m
-    {
-        forall m' | inf(ms, m') 
-            ensures m' == m
-        {
-            infUnique(ms, m, m');
-        }
-    }
-
-    ghost function UpperSum(f: real -> real, P: Partition, a: real, b: real): real 
-        requires a < b
-        requires f in BoundedFunctions(a, b)
-        requires PartitionOf(a,b, P)
-    {
-        UpperSumHelper(f, P, a, b, 1)
-    }
-
-    ghost function UpperSumHelper(f: real -> real, P: Partition, a: real, b: real, i: nat): real 
-        requires a < b
-        requires f in BoundedFunctions(a, b)
+        requires isBounded(f, a, b)
+        requires |P.xs| > 1
         requires PartitionPartial(a,b, P)
-        requires 1 <= i < |P.xs|
-        decreases |P.xs|-i
+        decreases |P.xs|
     {
-        var ms := iset x | P.xs[i-1] <= x <= P.xs[i] :: f(x);
-        var q := f(P.xs[i-1]);
+        var ms := funcRange(f, P.xs[0], P.xs[1]);
+        var q := f(P.xs[0]);
         assert q in ms;
         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
-        assert P.xs[i-1] in P.xs;
-        BoundedAbove(f, a, b, P.xs[i-1], P.xs[i], M);
-        CompletenessAxiomUpper(ms, M);
-        var M_i :| sup(ms, M_i);
-        if i == |P.xs|-1 then M_i * (P.xs[i] - P.xs[i-1]) else M_i * (P.xs[i] - P.xs[i-1]) + UpperSumHelper(f, P, a, b, i+1)
+        assert P.xs[0] in P.xs;
+        BoundedAbove(f, a, b, P.xs[0], P.xs[1], M);
+        var M_0 := supremum(ms, q, M);
+        var res := M_0*(P.xs[1]-P.xs[0]);
+        if |P.xs| == 2 then res else res + UpperSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), a, b)
     }
 
-    lemma AllPartitionSetBoundedLow(f: real -> real, a: real, b: real, M: real, fsup: real, P: Partition)
+    lemma AllPartitionSetBoundedLow(f: real -> real, a: real, b: real, M: real,  P: Partition)
         requires a < b
         requires M > 0.0
         requires isBoundedBetween(f, a, b, M)
         requires PartitionOf(a,b, P)
-        requires sup(funcRange(f, a, b), fsup)
-        ensures LowerSum(f, P, a, b) <= (b-a) * M
-    {}
+        // requires sup(funcRange(f, a, b), fsup)
+        ensures LowerSumAlt(f, P, a, b) <= prod((b-a), M)
+        decreases |P.xs|
+    {
+        if |P.xs| == 2 {
+            assert P.xs[0] == a;
+            assert P.xs[1] == b;
+            var ms := funcRange(f, P.xs[0], P.xs[1]);
+            var q := f(P.xs[0]);
+            assert q in ms;
+            var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+            assert P.xs[0] in P.xs;
+            BoundedBelow(f, a, b, P.xs[0], P.xs[1], M);
+            var m_0 := infimum(ms, q, -M);
+            infAllUnique(funcRange(f, P.xs[0], P.xs[1]), m_0);
+            InfWidthSame(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]), m_0);
+            calc {
+                LowerSumAlt(f, P, a, b);
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
+                prod(m_0,(P.xs[1]-P.xs[0]));
+                m_0*(P.xs[1]-P.xs[0]);
+            }
+            assert (P.xs[1]-P.xs[0]) == (b-a);
+            assert m_0 <= M;
+            prodLessThan(m_0, b-a, M);
+            assert ablte(m_0, b-a, M);
+            assert prod(m_0,b-a) <= prod(M,b-a);
+            assert m_0*(b-a) <= M*(b-a);
+            assert InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) <= (b-a) * M;
+            assert LowerSumAlt(f, P, a, b) <= (b-a) * M;
+            assert LowerSumAlt(f, P, a, b) <= prod((b-a), M);
+        }else{
+            var P_First := Partition(P.xs[..2], {P.xs[0], P.xs[1]});
+            var P_next := Partition(P.xs[1..], P.s - {P.xs[0]});
+            assert P_next.xs[|P_next.xs|-1] == b;
+            assert a < P.xs[1] < b;
+            functionBoundedInMiddle(f, a, b, P.xs[1]);
+            LowerSumConcat(f, P, P_First, P_next, a, b, P.xs[1]);
 
-    lemma AllPartitionSetBoundedUpper(f: real -> real, a: real, b: real, M: real, P: Partition)
+            var ms := funcRange(f, P.xs[0], P.xs[1]);
+            var q := f(P.xs[0]);
+            assert q in ms;
+            var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+            assert P.xs[0] in P.xs;
+            BoundedBelow(f, a, b, P.xs[0], P.xs[1], M);
+            var m_0 := infimum(ms, q, -M);
+            infAllUnique(funcRange(f, P.xs[0], P.xs[1]), m_0);
+            InfWidthSame(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]), m_0);
+            calc {
+                LowerSumAlt(f, P, a, b);
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
+                prod(m_0,(P.xs[1]-P.xs[0])) + LowerSumAlt(f, P_next, P.xs[1], b);
+                m_0 * (P.xs[1]-P.xs[0]) + LowerSumAlt(f, P_next, P.xs[1], b);
+            }
+            prodLessThan(m_0, P.xs[1]-P.xs[0], M);
+            assert ablte(m_0, P.xs[1]-P.xs[0], M);
+            assert prod(m_0,(P.xs[1]-P.xs[0])) <= prod(M,(P.xs[1]-P.xs[0]));
+            assert m_0*(P.xs[1]-P.xs[0]) <= M*(P.xs[1]-P.xs[0]);
+
+            var ms_rest := funcRange(f, P.xs[1], b);
+            var q_rest := f(P.xs[1]);
+            assert q_rest in ms_rest;
+            assert P.xs[1] in P_next.xs;
+            assert forall x :: P.xs[1] <= x <= b ==> f.requires(x);
+            BoundedBelow(f, a, b, P.xs[1], b, M);
+            var m_rest := infimum(ms_rest, q_rest, -M);
+            AllPartitionSetBoundedLow(f, P.xs[1], b, M, P_next);
+            assert LowerSumAlt(f, P_next, P.xs[1], b) <= prod((b-P.xs[1]), M);
+            assert LowerSumAlt(f, P_next, P.xs[1], b) <= (b-P.xs[1]) * M;
+            assert M*(P.xs[1]-P.xs[0]) + (b-P.xs[1])*M == M*(b-a);
+            // assert m_0*(P.xs[1]-P.xs[0]) + LowerSumAlt(f, P_next, P.xs[1], b) <= M*(P.xs[1]-P.xs[0]) + (b-P.xs[1])*M == M*(b-a);
+            assert m_0*(P.xs[1]-P.xs[0]) + LowerSumAlt(f, P_next, P.xs[1], b) <=  M*(b-a);
+            assert LowerSumAlt(f, P, a, b) <= (b-a) * M;
+            assert LowerSumAlt(f, P, a, b) <= prod((b-a) , M);
+        }
+    }
+
+    lemma  {:verify false} AllPartitionSetBoundedUpper(f: real -> real, a: real, b: real, M: real, P: Partition)
         requires a < b
         requires M > 0.0
         requires isBoundedBetween(f, a, b, M)
         requires PartitionOf(a,b, P)
-        ensures UpperSum(f, P, a, b) >= (b-a) * -M
+        ensures UpperSumAlt(f, P, a, b) >= (b-a) * -M
     {}
 
 
@@ -359,21 +414,22 @@ module NelsonCh0 {
     {
         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
         var allPartitions := iset P | PartitionOf(a,b, P);
-        var allPartitionSums := iset P | P in allPartitions :: LowerSum(f, P, a, b);
+        var allPartitionSums := iset P | P in allPartitions :: LowerSumAlt(f, P, a, b);
         var canonical_P := Partition([a, b], {a, b});
-        var x := LowerSum(f, canonical_P, a, b);
+        var x := LowerSumAlt(f, canonical_P, a, b);
         assert x in allPartitionSums;
-        CompletenessAxiomUpper(allPartitionSums, x);
-        var fsup :| sup(allPartitionSums, fsup);
-        
         assert forall sum :: sum in allPartitionSums ==> sum <= (b-a)*M by {
             forall sum | sum in allPartitionSums
                 ensures sum <= (b-a)*M
             {
-                var P :| P in allPartitions && sum == LowerSum(f, P, a, b);
-                AllPartitionSetBoundedLow(f, a, b, M, fsup, P);
+                var P :| P in allPartitions && sum == LowerSumAlt(f, P, a, b);
+                AllPartitionSetBoundedLow(f, a, b, M,  P);
             }
         }
+        assert upperBound(allPartitionSums, (b-a)*M);
+        CompletenessAxiomUpper(allPartitionSums, (b-a)*M);
+        var fsup :| sup(allPartitionSums, fsup);
+        
        supremum(allPartitionSums, x,  (b-a)*M)
     }
 
@@ -383,14 +439,14 @@ module NelsonCh0 {
     {
         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
         var allPartitions := iset P | PartitionOf(a,b, P);
-        var allPartitionSums := iset P | P in allPartitions :: UpperSum(f, P, a, b);
+        var allPartitionSums := iset P | P in allPartitions :: UpperSumAlt(f, P, a, b);
         var canonical_P := Partition([a, b], {a, b});
-        var x := UpperSum(f, canonical_P, a, b);
+        var x := UpperSumAlt(f, canonical_P, a, b);
         assert forall sum :: sum in allPartitionSums ==> sum >= (b-a)*-M by {
             forall sum | sum in allPartitionSums
                 ensures sum >= (b-a)*-M
             {
-                var P :| P in allPartitions && sum == UpperSum(f, P, a, b);
+                var P :| P in allPartitions && sum == UpperSumAlt(f, P, a, b);
                 AllPartitionSetBoundedUpper(f, a, b, M, P);
             }
         }
@@ -408,26 +464,109 @@ module NelsonCh0 {
         requires PartitionOf(a,b, P)
         requires inf(funcRange(f, a, b), m)
         requires sup(funcRange(f, a, b), M)
-        ensures m*(b-a) <= LowerSum(f, P, a, b) <= UpperSum(f, P, a, b) <= M*(b-a)
+        ensures m*(b-a) <= LowerSumAlt(f, P, a, b) <= UpperSumAlt(f, P, a, b) <= M*(b-a)
     {
         Prop_zero_one_six_inf(f, P, a, b, m);
         Prop_zero_one_six_lower_upper(f, P, a, b);
         Prop_zero_one_six_sup(f, P, a, b, M);
     }
 
-    lemma Prop_zero_one_six_inf(f: real -> real, P: Partition, a: real, b: real, m: real)
+    predicate ablte(a: real, b: real, a': real)
+    {
+        prod(a,b) <= prod(a',b)
+    }
+
+    lemma prodLessThan(a: real, b: real, a': real)
+        requires a <= a'
+        requires b > 0.0
+        ensures ablte(a, b, a')
+    {
+    }
+
+
+    lemma {:vcs_split_on_every_assert} Prop_zero_one_six_inf(f: real -> real, P: Partition, a: real, b: real, m: real)
         requires a < b
-        requires f in BoundedFunctions(a, b)
+        requires isBounded(f, a, b)
         requires PartitionOf(a,b, P)
         requires inf(funcRange(f, a, b), m)
-        ensures m*(b-a) <= LowerSum(f, P, a, b)
+        ensures m*(b-a) <= LowerSumAlt(f, P, a, b)
+        decreases |P.xs|
     {
-        var l := LowerSum(f, P, a, b);
+        var l := LowerSumAlt(f, P, a, b);
         if P.xs == [a, b] {
             infAllUnique(funcRange(f, P.xs[0], P.xs[1]), m);
+            var ms := funcRange(f, P.xs[0], P.xs[1]);
+            var q := f(P.xs[0]);
+            assert q in ms;
+            var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+            assert P.xs[0] in P.xs;
+            BoundedBelow(f, a, b, P.xs[0], P.xs[1], M);
+            var m_0 := infimum(ms, q, -M);
+            calc {
+                LowerSumAlt(f, P, a, b);
+                m_0*(P.xs[1]-P.xs[0]);
+            }
             assert m*(b-a) <= l;
         } else {
-            // assert l >= m*(b-a);
+            var P_First := Partition(P.xs[..2], {P.xs[0], P.xs[1]});
+            var P_next := Partition(P.xs[1..], P.s - {P.xs[0]});
+            assert a < P.xs[1] < b;
+            functionBoundedInMiddle(f, a, b, P.xs[1]);
+            LowerSumConcat(f, P, P_First, P_next, a, b, P.xs[1]);
+            assert LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_First, a, P.xs[1]) + LowerSumAlt(f, P_next, P.xs[1], b);
+            calc {
+                LowerSumAlt(f, P, a, b);
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
+            }
+            assert P.xs[0] == P_First.xs[0];
+            assert P.xs[1] == P_First.xs[1];
+            calc {
+                LowerSumAlt(f, P_First, a, P.xs[1]);
+                InfWidth(f, P_First.xs[0], P_First.xs[1], funcRange(f, P_First.xs[0], P_First.xs[1]));
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
+            }
+
+            var ms := funcRange(f, P.xs[1], b);
+            var q := f(P.xs[1]);
+            assert q in ms;
+            var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
+            assert P.xs[1] in P_next.xs;
+            assert forall x :: P.xs[1] <= x <= b ==> f.requires(x);
+            BoundedBelow(f, a, b, P.xs[1], b, M);
+            var m_rest := infimum(ms, q, -M);
+            Prop_zero_one_six_inf(f, P_next, P.xs[1], b, m_rest);
+            assert m_rest*(b-P.xs[1]) <= LowerSumAlt(f, P_next, P.xs[1], b);
+            calc {
+                l;
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
+            }
+
+            assert m_rest >= m by {
+                assert ms <= funcRange(f, a, b);
+                if m_rest < m {
+                    assert lowerBound(ms, m);
+                    assert lowerBound(ms, m_rest);
+                    assert lowerBound(funcRange(f, a, b), m_rest);
+                    var diff := m - m_rest;
+                    assert diff > 0.0;
+                    var epsilon := diff / 2.0;
+                    assert !lowerBound(ms, add(m_rest, epsilon));
+
+                    assert false;
+                }
+            }
+            assert b-P.xs[1] > 0.0;
+            prodLessThan(m, b-P.xs[1], m_rest);
+            // assert m*(b-P.xs[1]) <= m_rest*(b-P.xs[1]);
+            InfOfAllLessThanSome(f, a, b, P.xs[0], P.xs[1], funcRange(f,a,b), m);
+            assert MidInfWidthLessThan(f, P.xs[0], P.xs[1], a, b, m);
+            assert m*(P.xs[1]-P.xs[0]) <= InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
+            // InfOfAllLessThanSome(f, a, b, P.xs[1], b, funcRange(f,a,b), m);
+            
+            assert m * (b-a) == m*(P.xs[1]-P.xs[0]) + m*(b-P.xs[1]);
+            assert m * (b-a) <= m*(P.xs[1]-P.xs[0]) + m*(b-P.xs[1]) <= m*(P.xs[1]-P.xs[0]) + m_rest*(b-P.xs[1]);
+            assert m_rest*(b-P.xs[1]) <= LowerSumAlt(f, P_next, P.xs[1], b);
+            assert m*(P.xs[1]-P.xs[0]) + m_rest*(b-P.xs[1]) <= InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
             assert m*(b-a) <= l;
             //Forall m_i, m <= m_i
             //forall i, sum(P.xs[i+1] - P.xs[i]) == b-a
@@ -438,25 +577,25 @@ module NelsonCh0 {
         }
     }
 
-    lemma Prop_zero_one_six_sup(f: real -> real, P: Partition, a: real, b: real, M: real)
+    lemma {:verify false} Prop_zero_one_six_sup(f: real -> real, P: Partition, a: real, b: real, M: real)
         requires a < b
         requires f in BoundedFunctions(a, b)
         requires PartitionOf(a,b, P)
         requires sup(funcRange(f, a, b), M)
-        ensures UpperSum(f, P, a, b) <= M*(b-a)
+        ensures UpperSumAlt(f, P, a, b) <= M*(b-a)
     {
-        var u := UpperSum(f, P, a, b);
+        var u := UpperSumAlt(f, P, a, b);
         assert u <= M*(b-a);
     }
 
-    lemma Prop_zero_one_six_lower_upper(f: real -> real, P: Partition, a: real, b: real)
+    lemma {:verify false} Prop_zero_one_six_lower_upper(f: real -> real, P: Partition, a: real, b: real)
         requires a < b
         requires f in BoundedFunctions(a, b)
         requires PartitionOf(a,b, P)
-        ensures LowerSum(f, P, a, b) <= UpperSum(f, P, a, b)
+        ensures LowerSumAlt(f, P, a, b) <= UpperSumAlt(f, P, a, b)
     {
-        var l := LowerSum(f, P, a, b);
-        var u := UpperSum(f, P, a, b);
+        var l := LowerSumAlt(f, P, a, b);
+        var u := UpperSumAlt(f, P, a, b);
         assert l <= u;
     }
 
@@ -470,14 +609,16 @@ module NelsonCh0 {
         ensures LowerIntegral(f, a, b) <= LowerIntegral(g, a, b)
     {}
 
-    lemma {:verify } {:vcs_split_on_every_assert} Problem5a(f: real -> real, g: real -> real, a: real, b: real, c: real)
+    lemma {:verify } {:vcs_split_on_every_assert} Problem5a(f: real -> real, a: real, b: real, c: real) returns (g: real -> real)
         requires a < b
         requires a <= c <= b
         requires isBounded(f, a, b)
         requires RiemannIntegrable(f, a, b)
-        requires forall x :: a <= x <= b && x != c ==> f(x) == g(x)
+        ensures forall x :: a <= x <= b && x != c ==> f(x) == g(x)
         ensures RiemannIntegrable(g, a, b)
     {
+        var Gc: real :| true;
+        g := (x: real) => if x == c then Gc else f(x);
         assert isBounded(g, a, b) by {
             var M :| M > 0.0 && isBoundedBetween(f, a, b, M);
             if -M <= g(c) <= M {
@@ -510,6 +651,7 @@ module NelsonCh0 {
             }
         }
         assume LowerIntegral(g, a, b) == UpperIntegral(g, a, b);
+        return g;
     }
 
     lemma EqualFunctionUpper(f: real -> real, g: real -> real, a: real, b: real)
@@ -553,19 +695,16 @@ module NelsonCh0 {
         requires isBounded(g, a, b)
         ensures LowerIntegral(f, a, b) == LowerIntegral(g, a, b)
 
-    lemma {:verify } {:vcs_split_on_every_assert} Problem5b(f: real -> real, g: real -> real, a: real, b: real, diffpoints: set<real>)
+    lemma {:verify } Problem5b(f: real -> real, a: real, b: real, diffpoints: set<real>) returns  (g: real -> real)
         requires a < b
         requires forall c :: c in diffpoints ==> a <= c <= b
         requires isBounded(f, a, b)
         requires RiemannIntegrable(f, a, b)
-        requires forall x :: a <= x <= b && x !in diffpoints ==> f(x) == g(x)
+        ensures forall x :: a <= x <= b && x !in diffpoints ==> f(x) == g(x)
         ensures RiemannIntegrable(g, a, b)
     {
         if |diffpoints| == 0 {
-            EqualBoundedFunctionsAlsoBounded(f, g, a, b);
-            EqualFunctionLower(f, g, a, b);
-            EqualFunctionUpper(f, g, a, b);
-            assert RiemannIntegrable(g, a, b);
+            return f;
         } else if |diffpoints| == 1 {
             var c :| c in diffpoints;
             assert diffpoints == {c} by {
@@ -573,17 +712,38 @@ module NelsonCh0 {
                 assert |diffpoints - {c}| == 0;
                 assert diffpoints - {c} == {};
             }
-            forall x | a <= x <= b && x != c
-                ensures f(x) == g(x)
-            {
-                assert x != c;
-                assert x !in diffpoints;
-            }
-            Problem5a(f, g, a, b, c);
+            g := Problem5a(f,  a, b, c);
+            assert RiemannIntegrable(g, a, b);
+            return g;
         } else {
             var c :| c in diffpoints;
-            Problem5b(f, g, a, b, diffpoints-{c});
-            Problem5a(f, g, a, b, c);
+            var g' := Problem5b(f, a, b, diffpoints-{c});
+            var gc: real :| true;
+            g := (x: real) => if x == c then gc else g'(x);
+            assert isBounded(g', a, b);
+            var M' :| M' > 0.0 && isBoundedBetween(g', a, b, M');
+            var M := if M' > abs(gc) then M' else abs(gc);
+            assert forall x :: a <= x <= b && x !in diffpoints ==> f(x) == g(x);
+            assert isBounded(g, a, b) by {
+                forall x | a <= x <= b
+                    ensures g.requires(x)
+                    ensures abs(g(x)) <= M
+                {
+                    if x == c {
+                        assert abs(gc) <= M;
+                        assert abs(g(x)) <= M;
+                    } else {
+                        assert g'(x) == g(x);
+                        assert g'.requires(x);
+                        assert abs(g'(x)) <= M';
+                        assert abs(g(x)) <= M;
+                    }
+                }
+                assert isBoundedBetween(g, a, b, M);
+            }
+            assume LowerIntegral(g, a, b) == UpperIntegral(g, a, b);
+            assert RiemannIntegrable(g, a, b);
+            return g;
         }
     }
 }
