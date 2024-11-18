@@ -193,4 +193,35 @@ module NelsonCh0Defs {
         }
     }
 
+    lemma supUnique(ms: iset<real>, m: real, m': real)
+        requires sup(ms, m)
+        requires sup(ms, m')
+        ensures m == m'
+    {
+        if m != m' {
+            assert upperBound(ms, m);
+            assert upperBound(ms, m');
+            if m < m' {
+                var diff := m' - m;
+                assert m == sub(m', diff);
+            } else {
+                assert m > m';
+                var diff := m - m';
+                assert m' == sub(m, diff);
+            }
+            assert false;
+        }
+    }
+
+    lemma supAllUnique(ms: iset<real>, m: real)
+        requires sup(ms, m)
+        ensures forall m' :: sup(ms, m') ==> m' == m
+    {
+        forall m' | sup(ms, m') 
+            ensures m' == m
+        {
+            supUnique(ms, m, m');
+        }
+    }
+
 }
