@@ -46,6 +46,14 @@ module Analysis {
         a * b
     }
 
+    lemma ProdDistributesOverSum(a: real, b: real, c: real)
+        ensures prod(a, b + c) == prod(a, b) + prod(a, c)
+    {}
+
+    lemma ProdDistributesOverSum2(a: real, b: real, c: real)
+        ensures prod(a+b, c) == prod(a, b) + prod(a, c)
+    {}
+
     function div(a: real, b: real): real 
         requires b != 0.0
     {
