@@ -154,7 +154,7 @@ module NelsonCh0 {
         assert m*(y-x) <= m_0*(y-x);
     }
 
-    ghost function LowerSumAlt(f: real -> real, P: Partition, a: real, b: real): real 
+    ghost function LowerSum(f: real -> real, P: Partition, a: real, b: real): real 
         requires a < b
         requires isBounded(f, a, b)
         requires |P.xs| > 1
@@ -163,7 +163,7 @@ module NelsonCh0 {
     {
         if |P.xs| == 2 then InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) else
         functionBoundedInMiddle(f, a, b, P.xs[1]);
-        InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b)
+        InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b)
     }
 
     function PartitionRemoveIndex(p: Partition, a: real, b: real, i: nat): Partition
@@ -185,7 +185,7 @@ module NelsonCh0 {
         requires PartitionOf(a,b, P_1)
         requires PartitionOf(b,c, P_2)
         requires PartitionOf(c,d, P_3)
-        ensures LowerSumAlt(f, P_1, a, b) + (LowerSumAlt(f, P_2, b, c) + LowerSumAlt(f, P_3, c, d)) == (LowerSumAlt(f, P_1, a, b) + LowerSumAlt(f, P_2, b, c)) + LowerSumAlt(f, P_3, c, d)
+        ensures LowerSum(f, P_1, a, b) + (LowerSum(f, P_2, b, c) + LowerSum(f, P_3, c, d)) == (LowerSum(f, P_1, a, b) + LowerSum(f, P_2, b, c)) + LowerSum(f, P_3, c, d)
         {
 
         }
@@ -199,7 +199,7 @@ module NelsonCh0 {
         requires PartitionOf(c,b, P_2)
         requires P == Partition(P_1.xs[..|P_1.xs|-1]+P_2.xs, P_1.s+P_2.s)
         requires PartitionOf(a,b, P)
-        ensures LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b)
+        ensures LowerSum(f, P, a, b) == LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b)
         decreases |P.xs|
     {
         assert P_1.xs[|P_1.xs|-1] == c;
@@ -210,17 +210,17 @@ module NelsonCh0 {
             assert P.xs[0] == P_1.xs[0];
             assert P.xs[1] == P_1.xs[1];
             assert P_2 == Partition(P.xs[1..], P.s - {P.xs[0]});
-            assert LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b) == LowerSumAlt(f, P_2, c, b);
+            assert LowerSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b) == LowerSum(f, P_2, c, b);
             var d0 := InfWidth(f, P_1.xs[0], P_1.xs[1], funcRange(f, P_1.xs[0], P_1.xs[1]));
             var d1 := InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
             assert d0 == d1;
             calc {
-                LowerSumAlt(f, P, a, b);
-                d1 + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
-                d0 + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
-                LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+                LowerSum(f, P, a, b);
+                d1 + LowerSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+                d0 + LowerSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+                LowerSum(f, P_1, a, c) + LowerSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
             }
-            assert LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b);
+            assert LowerSum(f, P, a, b) == LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b);
         } else {
             var c' := P_1.xs[1];
             assert c' != c && c' < c;
@@ -239,13 +239,13 @@ module NelsonCh0 {
             assert d0 == d1;
             LowerSumConcat(f,P_next, P_1_next, P_2, c', b, c);
             calc {
-                LowerSumAlt(f, P, a, b);
-                d1 + LowerSumAlt(f, P_next, P.xs[1], b);
-                d0 + LowerSumAlt(f, P_next, P.xs[1], b);
-                d0 + LowerSumAlt(f, P_1_next, c', c) + LowerSumAlt(f, P_2, c, b);
-                LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b);
+                LowerSum(f, P, a, b);
+                d1 + LowerSum(f, P_next, P.xs[1], b);
+                d0 + LowerSum(f, P_next, P.xs[1], b);
+                d0 + LowerSum(f, P_1_next, c', c) + LowerSum(f, P_2, c, b);
+                LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b);
             }
-            assert LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_1, a, c) + LowerSumAlt(f, P_2, c, b);
+            assert LowerSum(f, P, a, b) == LowerSum(f, P_1, a, c) + LowerSum(f, P_2, c, b);
         }
     }
 
@@ -258,7 +258,7 @@ module NelsonCh0 {
         requires PartitionOf(c,b, P_2)
         requires P == Partition(P_1.xs[..|P_1.xs|-1]+P_2.xs, P_1.s+P_2.s)
         requires PartitionOf(a,b, P)
-        ensures UpperSumAlt(f, P, a, b) == UpperSumAlt(f, P_1, a, c) + UpperSumAlt(f, P_2, c, b)
+        ensures UpperSum(f, P, a, b) == UpperSum(f, P_1, a, c) + UpperSum(f, P_2, c, b)
         decreases |P.xs|
     {
         assert P_1.xs[|P_1.xs|-1] == c;
@@ -273,11 +273,11 @@ module NelsonCh0 {
             var d1 := SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
             assert d0 == d1;
             calc {
-                UpperSumAlt(f, P, a, b);
-                d1 + UpperSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
-                d0 + UpperSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+                UpperSum(f, P, a, b);
+                d1 + UpperSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
+                d0 + UpperSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b);
             }
-            assert UpperSumAlt(f, P, a, b) == UpperSumAlt(f, P_1, a, c) + UpperSumAlt(f, P_2, c, b);
+            assert UpperSum(f, P, a, b) == UpperSum(f, P_1, a, c) + UpperSum(f, P_2, c, b);
         } else {
             var c' := P_1.xs[1];
             assert c' != c && c' < c;
@@ -296,17 +296,17 @@ module NelsonCh0 {
             assert d0 == d1;
             UpperSumConcat(f,P_next, P_1_next, P_2, c', b, c);
             calc {
-                UpperSumAlt(f, P, a, b);
-                d1 + UpperSumAlt(f, P_next, P.xs[1], b);
-                d0 + UpperSumAlt(f, P_next, P.xs[1], b);
-                d0 + UpperSumAlt(f, P_1_next, c', c) + UpperSumAlt(f, P_2, c, b);
-                UpperSumAlt(f, P_1, a, c) + UpperSumAlt(f, P_2, c, b);
+                UpperSum(f, P, a, b);
+                d1 + UpperSum(f, P_next, P.xs[1], b);
+                d0 + UpperSum(f, P_next, P.xs[1], b);
+                d0 + UpperSum(f, P_1_next, c', c) + UpperSum(f, P_2, c, b);
+                UpperSum(f, P_1, a, c) + UpperSum(f, P_2, c, b);
             }
-            assert UpperSumAlt(f, P, a, b) == UpperSumAlt(f, P_1, a, c) + UpperSumAlt(f, P_2, c, b);
+            assert UpperSum(f, P, a, b) == UpperSum(f, P_1, a, c) + UpperSum(f, P_2, c, b);
         }
     }
 
-    ghost function UpperSumAlt(f: real -> real, P: Partition, a: real, b: real): real 
+    ghost function UpperSum(f: real -> real, P: Partition, a: real, b: real): real 
         requires a < b
         requires isBounded(f, a, b)
         requires |P.xs| > 1
@@ -315,7 +315,7 @@ module NelsonCh0 {
     {
         if |P.xs| == 2 then SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) else
         functionBoundedInMiddle(f, a, b, P.xs[1]);
-        SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + UpperSumAlt(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b)
+        SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + UpperSum(f, Partition(P.xs[1..], P.s - {P.xs[0]}), P.xs[1], b)
     }
 
     lemma AllPartitionSetBoundedLow(f: real -> real, a: real, b: real, M: real,  P: Partition)
@@ -324,7 +324,7 @@ module NelsonCh0 {
         requires isBoundedBetween(f, a, b, M)
         requires PartitionOf(a,b, P)
         // requires sup(funcRange(f, a, b), fsup)
-        ensures LowerSumAlt(f, P, a, b) <= prod(M, sub(b,a))
+        ensures LowerSum(f, P, a, b) <= prod(M, sub(b,a))
         decreases |P.xs|
     {
         var ms := funcRange(f, a, b);
@@ -334,7 +334,7 @@ module NelsonCh0 {
         assert sup(funcRange(f, a, b), s);
         var i :| inf(ms, i);
         Prop_zero_one_six(f, P, a, b, i, s);
-        assert LowerSumAlt(f, P, a, b) <= prod(s, sub(b, a));
+        assert LowerSum(f, P, a, b) <= prod(s, sub(b, a));
         SupLTEBound(f, P, a,b, M, s);
         assert s <= M;
         prodLessThan(s, sub(b,a), M);
@@ -345,7 +345,7 @@ module NelsonCh0 {
         requires M > 0.0
         requires isBoundedBetween(f, a, b, M)
         requires PartitionOf(a,b, P)
-        ensures UpperSumAlt(f, P, a, b) >= prod(-M, sub(b,a))
+        ensures UpperSum(f, P, a, b) >= prod(-M, sub(b,a))
     {
         var ms := funcRange(f, a, b);
         var si := SupWidth(f, a, b, ms);
@@ -354,11 +354,11 @@ module NelsonCh0 {
         assert sup(funcRange(f, a, b), s);
         var i :| inf(ms, i);
         Prop_zero_one_six(f, P, a, b, i, s);
-        assert UpperSumAlt(f, P, a, b) >= prod(i, sub(b, a));
+        assert UpperSum(f, P, a, b) >= prod(i, sub(b, a));
         InfGTEBound(f, P, a,b, M, i);
         assert i >= -M;
         prodLessThan(-M, sub(b,a), i);
-        assert prod(-M, sub(b,a)) <= prod(i, sub(b,a)) <= UpperSumAlt(f, P, a, b);
+        assert prod(-M, sub(b,a)) <= prod(i, sub(b,a)) <= UpperSum(f, P, a, b);
     }
 
 
@@ -368,15 +368,15 @@ module NelsonCh0 {
     {
         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
         var allPartitions := iset P | PartitionOf(a,b, P);
-        var allPartitionSums := iset P | P in allPartitions :: LowerSumAlt(f, P, a, b);
+        var allPartitionSums := iset P | P in allPartitions :: LowerSum(f, P, a, b);
         var canonical_P := Partition([a, b], {a, b});
-        var x := LowerSumAlt(f, canonical_P, a, b);
+        var x := LowerSum(f, canonical_P, a, b);
         assert x in allPartitionSums;
         assert forall sum :: sum in allPartitionSums ==> sum <= prod((b-a),M) by {
             forall sum | sum in allPartitionSums
                 ensures sum <= prod(M, sub(b,a))
             {
-                var P :| P in allPartitions && sum == LowerSumAlt(f, P, a, b);
+                var P :| P in allPartitions && sum == LowerSum(f, P, a, b);
                 AllPartitionSetBoundedLow(f, a, b, M,  P);
             }
         }
@@ -393,14 +393,14 @@ module NelsonCh0 {
     {
         var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
         var allPartitions := iset P | PartitionOf(a,b, P);
-        var allPartitionSums := iset P | P in allPartitions :: UpperSumAlt(f, P, a, b);
+        var allPartitionSums := iset P | P in allPartitions :: UpperSum(f, P, a, b);
         var canonical_P := Partition([a, b], {a, b});
-        var x := UpperSumAlt(f, canonical_P, a, b);
+        var x := UpperSum(f, canonical_P, a, b);
         assert forall sum :: sum in allPartitionSums ==> sum >= prod(-M, sub(b,a)) by {
             forall sum | sum in allPartitionSums
                 ensures sum >= prod(-M, sub(b,a))
             {
-                var P :| P in allPartitions && sum == UpperSumAlt(f, P, a, b);
+                var P :| P in allPartitions && sum == UpperSum(f, P, a, b);
                 AllPartitionSetBoundedUpper(f, a, b, M, P);
             }
         }
@@ -468,7 +468,7 @@ module NelsonCh0 {
         requires PartitionOf(a,b, P)
         requires inf(funcRange(f, a, b), m)
         requires sup(funcRange(f, a, b), M)
-        ensures prod(m, sub(b,a)) <= LowerSumAlt(f, P, a, b) <= UpperSumAlt(f, P, a, b) <= prod(M,sub(b,a))
+        ensures prod(m, sub(b,a)) <= LowerSum(f, P, a, b) <= UpperSum(f, P, a, b) <= prod(M,sub(b,a))
     {
         Prop_zero_one_six_inf(f, P, a, b, m);
         Prop_zero_one_six_lower_upper(f, P, a, b);
@@ -505,10 +505,10 @@ module NelsonCh0 {
         requires isBounded(f, a, b)
         requires PartitionOf(a,b, P)
         requires inf(funcRange(f, a, b), m)
-        ensures prod(m,sub(b,a)) <= LowerSumAlt(f, P, a, b)
+        ensures prod(m,sub(b,a)) <= LowerSum(f, P, a, b)
         decreases |P.xs|
     {
-        var l := LowerSumAlt(f, P, a, b);
+        var l := LowerSum(f, P, a, b);
         // if P.xs == [a, b] {
         if |P.xs| == 2 {
             assert |P.xs| == 2;
@@ -523,7 +523,7 @@ module NelsonCh0 {
             BoundedBelow(f, a, b, P.xs[0], P.xs[1], M);
             var m_0 := infimum(ms, q, -M);
             calc {
-                LowerSumAlt(f, P, a, b);
+                LowerSum(f, P, a, b);
                 prod(m_0,sub(P.xs[1],P.xs[0]));
             }
             assert m == m_0 by {
@@ -537,15 +537,15 @@ module NelsonCh0 {
             assert a < P.xs[1] < b;
             functionBoundedInMiddle(f, a, b, P.xs[1]);
             LowerSumConcat(f, P, P_First, P_next, a, b, P.xs[1]);
-            assert LowerSumAlt(f, P, a, b) == LowerSumAlt(f, P_First, a, P.xs[1]) + LowerSumAlt(f, P_next, P.xs[1], b);
+            assert LowerSum(f, P, a, b) == LowerSum(f, P_First, a, P.xs[1]) + LowerSum(f, P_next, P.xs[1], b);
             calc {
-                LowerSumAlt(f, P, a, b);
-                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
+                LowerSum(f, P, a, b);
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSum(f, P_next, P.xs[1], b);
             }
             assert P.xs[0] == P_First.xs[0];
             assert P.xs[1] == P_First.xs[1];
             calc {
-                LowerSumAlt(f, P_First, a, P.xs[1]);
+                LowerSum(f, P_First, a, P.xs[1]);
                 InfWidth(f, P_First.xs[0], P_First.xs[1], funcRange(f, P_First.xs[0], P_First.xs[1]));
                 InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
             }
@@ -559,10 +559,10 @@ module NelsonCh0 {
             BoundedBelow(f, a, b, P.xs[1], b, M);
             var m_rest := infimum(ms, q, -M);
             Prop_zero_one_six_inf(f, P_next, P.xs[1], b, m_rest);
-            assert prod(m_rest, sub(b,P.xs[1])) <= LowerSumAlt(f, P_next, P.xs[1], b);
+            assert prod(m_rest, sub(b,P.xs[1])) <= LowerSum(f, P_next, P.xs[1], b);
             calc {
                 l;
-                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
+                InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSum(f, P_next, P.xs[1], b);
             }
 
             assert m_rest >= m by {
@@ -608,7 +608,7 @@ module NelsonCh0 {
                 assert prod(m,sub(P.xs[1],P.xs[0])) + prod(m,sub(b,P.xs[1])) == prod(m,sub(b,a));
                 assert prod(m, sub(b,a)) <= prod(m, sub(b,a)) + prod(diff,sub(b,P.xs[1]));
             }
-            assert prod(m,sub(P.xs[1],P.xs[0])) + prod(m_rest,sub(b,P.xs[1])) <= InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSumAlt(f, P_next, P.xs[1], b);
+            assert prod(m,sub(P.xs[1],P.xs[0])) + prod(m_rest,sub(b,P.xs[1])) <= InfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + LowerSum(f, P_next, P.xs[1], b);
             assert prod(m,sub(b,a)) <= l;
         }
     }
@@ -618,10 +618,10 @@ module NelsonCh0 {
         requires isBounded(f, a, b)
         requires PartitionOf(a,b, P)
         requires sup(funcRange(f, a, b), M)
-        ensures UpperSumAlt(f, P, a, b) <= prod(M, sub(b,a))
+        ensures UpperSum(f, P, a, b) <= prod(M, sub(b,a))
         decreases |P.xs|
     {
-        var u := UpperSumAlt(f, P, a, b);
+        var u := UpperSum(f, P, a, b);
         if |P.xs| == 2 {
             assert |P.xs| == 2;
             assert P.xs[0] == a;
@@ -629,7 +629,7 @@ module NelsonCh0 {
             var sw := SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
             var m_0 :| sup(funcRange(f, P.xs[0], P.xs[1]), m_0);
             calc {
-                UpperSumAlt(f, P, a, b);
+                UpperSum(f, P, a, b);
                 prod(m_0,sub(P.xs[1],P.xs[0]));
             }
             assert u <= prod(M,sub(b,a));
@@ -641,11 +641,11 @@ module NelsonCh0 {
             assert a < P.xs[1] < b;
             functionBoundedInMiddle(f, a, b, P.xs[1]);
             UpperSumConcat(f, P, P_First, P_next, a, b, P.xs[1]);
-            assert UpperSumAlt(f, P, a, b) == UpperSumAlt(f, P_First, a, P.xs[1]) + UpperSumAlt(f, P_next, P.xs[1], b);
+            assert UpperSum(f, P, a, b) == UpperSum(f, P_First, a, P.xs[1]) + UpperSum(f, P_next, P.xs[1], b);
             calc {
-                UpperSumAlt(f, P, a, b);
-                SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + UpperSumAlt(f, P_next, P.xs[1], b);
-                prod(s, sub(P.xs[1], P.xs[0])) + UpperSumAlt(f, P_next, P.xs[1], b);
+                UpperSum(f, P, a, b);
+                SupWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1])) + UpperSum(f, P_next, P.xs[1], b);
+                prod(s, sub(P.xs[1], P.xs[0])) + UpperSum(f, P_next, P.xs[1], b);
             }
             assert P.xs[0] == P_First.xs[0] == a;
             assert P.xs[1] == P_First.xs[1];
@@ -681,8 +681,8 @@ module NelsonCh0 {
             }
             prodLessThan(s, sub(P.xs[1],P.xs[0]), M);
             prodLessThan(sup_rest, sub(b,P.xs[1]), M);
-            assert prod(M, sub(P.xs[1], P.xs[0]))  >= prod(s, sub(P.xs[1], P.xs[0])) >= UpperSumAlt(f, P_First, a, P.xs[1]);
-            assert prod(M, sub(b, P.xs[1])) >= prod(sup_rest, sub(b,P.xs[1])) >= UpperSumAlt(f, P_next, P.xs[1], b);
+            assert prod(M, sub(P.xs[1], P.xs[0]))  >= prod(s, sub(P.xs[1], P.xs[0])) >= UpperSum(f, P_First, a, P.xs[1]);
+            assert prod(M, sub(b, P.xs[1])) >= prod(sup_rest, sub(b,P.xs[1])) >= UpperSum(f, P_next, P.xs[1], b);
             assert prod(M, sub(P.xs[1], P.xs[0])) + prod(M, sub(b, P.xs[1])) == prod(M, sub(b,a))  by {
                 ProdDistributesOverSum(M, sub(P.xs[1], P.xs[0]), sub(b, P.xs[1]));
                 assert sub(b,a) == sub(P.xs[1], P.xs[0]) + sub(b, P.xs[1]);
@@ -697,11 +697,11 @@ module NelsonCh0 {
         requires a < b
         requires isBounded(f, a, b)
         requires PartitionOf(a,b, P)
-        ensures LowerSumAlt(f, P, a, b) <= UpperSumAlt(f, P, a, b)
+        ensures LowerSum(f, P, a, b) <= UpperSum(f, P, a, b)
         decreases |P.xs|
     {
-        var l := LowerSumAlt(f, P, a, b);
-        var u := UpperSumAlt(f, P, a, b);
+        var l := LowerSum(f, P, a, b);
+        var u := UpperSum(f, P, a, b);
         if |P.xs| == 2 {
             SupWidthGTEInfWidth(f, P.xs[0], P.xs[1], funcRange(f, P.xs[0], P.xs[1]));
         }else{
@@ -720,7 +720,7 @@ module NelsonCh0 {
         requires a < b
         requires isBounded(f, a, b)
     {
-        PartitionOf(a,b, P) && sub(UpperSumAlt(f, P, a, b), LowerSumAlt(f, P, a, b)) < epsilon
+        PartitionOf(a,b, P) && sub(UpperSum(f, P, a, b), LowerSum(f, P, a, b)) < epsilon
     }
 
     predicate positive(x: real)
@@ -744,14 +744,14 @@ module NelsonCh0 {
         requires PartitionOf(a,b, P)
         requires PartitionOf(a,b, P2)
         requires IsRefinement(P, P2)
-        ensures LowerSumAlt(f, P, a, b) <= LowerSumAlt(f, P2, a, b) <= UpperSumAlt(f, P2, a, b) <= UpperSumAlt(f, P, a, b)
+        ensures LowerSum(f, P, a, b) <= LowerSum(f, P2, a, b) <= UpperSum(f, P2, a, b) <= UpperSum(f, P, a, b)
 
     lemma Lemma_zero_two_two_ii(f: real -> real, a: real, b: real, P1: Partition, P2: Partition)
         requires a < b
         requires isBounded(f, a, b)
         requires PartitionOf(a,b, P1)
         requires PartitionOf(a,b, P2)
-        ensures LowerSumAlt(f, P1, a, b) <= UpperSumAlt(f, P2, a, b)
+        ensures LowerSum(f, P1, a, b) <= UpperSum(f, P2, a, b)
 
     lemma Corollary_zero_two_three(f: real -> real, a: real, b: real)
         requires a < b
@@ -780,21 +780,21 @@ module NelsonCh0 {
     {
         var M :| M > 0.0 && isBoundedBetween(f, a, b, M);
         var allPartitions := iset P | PartitionOf(a,b, P);
-        var allPartitionSumsUpper := iset P | P in allPartitions :: UpperSumAlt(f, P, a, b);
-        var allPartitionSumsLower := iset P | P in allPartitions :: LowerSumAlt(f, P, a, b);
+        var allPartitionSumsUpper := iset P | P in allPartitions :: UpperSum(f, P, a, b);
+        var allPartitionSumsLower := iset P | P in allPartitions :: LowerSum(f, P, a, b);
         var canonical_P := Partition([a, b], {a, b});
         forall epsilon | positive(epsilon)
             ensures UpperIntegral(f, a, b) <= LowerIntegral(f, a, b) + epsilon
         {
                 assert positive(epsilon);
                 var P :| SumDiffLessThanEpsilon(f, P, a, b, epsilon);
-                assert UpperSumAlt(f, P, a, b) - LowerSumAlt(f, P, a, b) < epsilon;
+                assert UpperSum(f, P, a, b) - LowerSum(f, P, a, b) < epsilon;
                 assert P in allPartitions;
-                assert UpperSumAlt(f, P, a, b) in allPartitionSumsUpper;
-                assert LowerSumAlt(f, P, a, b) in allPartitionSumsLower;
-                assert LowerSumAlt(f, P, a, b) <= LowerIntegral(f, a, b);
-                assert UpperIntegral(f, a, b) <= UpperSumAlt(f, P, a, b);
-                assert UpperSumAlt(f, P, a, b) < LowerSumAlt(f, P, a, b) + epsilon <= LowerIntegral(f, a, b) + epsilon;
+                assert UpperSum(f, P, a, b) in allPartitionSumsUpper;
+                assert LowerSum(f, P, a, b) in allPartitionSumsLower;
+                assert LowerSum(f, P, a, b) <= LowerIntegral(f, a, b);
+                assert UpperIntegral(f, a, b) <= UpperSum(f, P, a, b);
+                assert UpperSum(f, P, a, b) < LowerSum(f, P, a, b) + epsilon <= LowerIntegral(f, a, b) + epsilon;
         }
         valApproachingZero(UpperIntegral(f, a, b), LowerIntegral(f, a, b));
         Corollary_zero_two_three(f, a, b);
@@ -855,12 +855,12 @@ module NelsonCh0 {
         }
 
     
-        var x := UpperSumAlt(f, canonical_P, a, b);
-        var allPartitionLowerSumsF := iset P | P in allPartitions :: LowerSumAlt(f, P, a, b);
-        var allPartitionLowerSumsG := iset P | P in allPartitions :: LowerSumAlt(g, P, a, b);
+        var x := UpperSum(f, canonical_P, a, b);
+        var allPartitionLowerSumsF := iset P | P in allPartitions :: LowerSum(f, P, a, b);
+        var allPartitionLowerSumsG := iset P | P in allPartitions :: LowerSum(g, P, a, b);
 
-        var allPartitionUpperSumsF := iset P | P in allPartitions :: UpperSumAlt(f, P, a, b);
-        var allPartitionUpperSumsG := iset P | P in allPartitions :: UpperSumAlt(g, P, a, b);
+        var allPartitionUpperSumsF := iset P | P in allPartitions :: UpperSum(f, P, a, b);
+        var allPartitionUpperSumsG := iset P | P in allPartitions :: UpperSum(g, P, a, b);
         // forall sum | sum in allPartitionUpperSumsF 
         //     ensures sum >= prod(-Mf, sub(b,a))
         //     ensures sum <= prod(Mf, sub(b,a))
@@ -876,33 +876,33 @@ module NelsonCh0 {
         forall sum | sum in allPartitionUpperSumsF 
             ensures prod(msf_inf, sub(b,a)) <= sum <= prod(msf_sup, sub(b,a))
         {
-            var P :| P in allPartitions && sum == UpperSumAlt(f, P, a, b);
+            var P :| P in allPartitions && sum == UpperSum(f, P, a, b);
             Prop_zero_one_six(f, P, a, b, msf_inf, msf_sup);
         }
         forall sum | sum in allPartitionUpperSumsG 
             ensures sum >= prod(msg_inf, sub(b,a))
             ensures sum <= prod(msg_sup, sub(b,a))
         {
-            var P :| P in allPartitions && sum == UpperSumAlt(g, P, a, b);
+            var P :| P in allPartitions && sum == UpperSum(g, P, a, b);
             Prop_zero_one_six(g, P, a, b, msg_inf, msg_sup);
         }
 
         forall sum | sum in allPartitionLowerSumsF 
             ensures prod(msf_inf, sub(b,a)) <= sum <= prod(msf_sup, sub(b,a))
         {
-            var P :| P in allPartitions && sum == LowerSumAlt(f, P, a, b);
+            var P :| P in allPartitions && sum == LowerSum(f, P, a, b);
             Prop_zero_one_six(f, P, a, b, msf_inf, msf_sup);
         }
         forall sum | sum in allPartitionLowerSumsG 
             ensures prod(msg_inf, sub(b,a)) <= sum <= prod(msg_sup, sub(b,a))
         {
-            var P :| P in allPartitions && sum == LowerSumAlt(g, P, a, b);
+            var P :| P in allPartitions && sum == LowerSum(g, P, a, b);
             Prop_zero_one_six(g, P, a, b, msg_inf, msg_sup);
         }
-        var fsuminf := infimum(allPartitionLowerSumsF, LowerSumAlt(f, canonical_P, a,b), prod(msf_inf, sub(b,a)));
-        var fsumsup := supremum(allPartitionUpperSumsF, UpperSumAlt(f, canonical_P, a,b), prod(msf_sup, sub(b,a)));
-        var gsuminf := infimum(allPartitionLowerSumsG, LowerSumAlt(g, canonical_P, a,b), prod(msg_inf, sub(b,a)));
-        var gsumsup := supremum(allPartitionUpperSumsG, UpperSumAlt(g, canonical_P, a,b), prod(msg_sup, sub(b,a)));
+        var fsuminf := infimum(allPartitionLowerSumsF, LowerSum(f, canonical_P, a,b), prod(msf_inf, sub(b,a)));
+        var fsumsup := supremum(allPartitionUpperSumsF, UpperSum(f, canonical_P, a,b), prod(msf_sup, sub(b,a)));
+        var gsuminf := infimum(allPartitionLowerSumsG, LowerSum(g, canonical_P, a,b), prod(msg_inf, sub(b,a)));
+        var gsumsup := supremum(allPartitionUpperSumsG, UpperSum(g, canonical_P, a,b), prod(msg_sup, sub(b,a)));
         assert LowerIntegral(f, a, b) <= LowerIntegral(g, a, b);
     }
 
