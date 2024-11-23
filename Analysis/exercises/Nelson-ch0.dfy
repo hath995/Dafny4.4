@@ -39,34 +39,6 @@ module NelsonCh0 {
         // assert oneOverX in BoundedFunctions(1.0, 2.0) by {}
     }
 
-
-    // ghost function LowerSum(f: real -> real, P: Partition, a: real, b: real): real 
-    //     requires a < b
-    //     requires isBounded(f, a, b)
-    //     requires PartitionOf(a,b, P)
-    // {
-    //     PartitionPointsBetweenAB(P, a, b);
-    //     LowerSumHelper(f, P, a, b, 1)
-    // }
-
-    // ghost function LowerSumHelper(f: real -> real, P: Partition, a: real, b: real, i: nat): real 
-    //     requires a < b
-    //     requires isBounded(f, a, b)
-    //     requires PartitionPartial(a,b, P)
-    //     requires 1 <= i < |P.xs|
-    //     decreases |P.xs|-i
-    // {
-    //     // var ms := iset x | P.xs[i-1] <= x <= P.xs[i] :: f(x);
-    //     var ms := funcRange(f, P.xs[i-1], P.xs[i]);
-    //     var q := f(P.xs[i-1]);
-    //     assert q in ms;
-    //     var M :| M > 0.0 && isBoundedBetween(f,a,b,M);
-    //     assert P.xs[i-1] in P.xs;
-    //     BoundedBelow(f, a, b, P.xs[i-1], P.xs[i], M);
-    //     var m_i := infimum(ms, q, -M);
-    //     if i == |P.xs|-1 then m_i * (P.xs[i] - P.xs[i-1]) else m_i * (P.xs[i] - P.xs[i-1]) + LowerSumHelper(f, P, a, b, i+1)
-    // }
-
     ghost function InfWidth(f: real -> real, x: real, y: real, ms: iset<real>): real 
         requires x < y
         requires ms == funcRange(f, x, y)
@@ -492,7 +464,7 @@ module NelsonCh0 {
 
     lemma Prop_zero_one_six(f: real -> real, P: Partition, a: real, b: real, m: real, M: real)
         requires a < b
-        requires f in BoundedFunctions(a, b)
+        requires isBounded(f, a, b)
         requires PartitionOf(a,b, P)
         requires inf(funcRange(f, a, b), m)
         requires sup(funcRange(f, a, b), M)
@@ -723,7 +695,7 @@ module NelsonCh0 {
 
     lemma Prop_zero_one_six_lower_upper(f: real -> real, P: Partition, a: real, b: real)
         requires a < b
-        requires f in BoundedFunctions(a, b)
+        requires isBounded(f, a, b)
         requires PartitionOf(a,b, P)
         ensures LowerSumAlt(f, P, a, b) <= UpperSumAlt(f, P, a, b)
         decreases |P.xs|
@@ -743,7 +715,93 @@ module NelsonCh0 {
         assert l <= u;
     }
 
-    lemma {:verify false} Problem3(f: real -> real, g: real -> real, a: real, b: real)
+    ghost predicate SumDiffLessThanEpsilon(f: real -> real, P: Partition, a: real, b: real, epsilon: real)
+        requires epsilon > 0.0
+        requires a < b
+        requires isBounded(f, a, b)
+    {
+        PartitionOf(a,b, P) && sub(UpperSumAlt(f, P, a, b), LowerSumAlt(f, P, a, b)) < epsilon
+    }
+
+    predicate positive(x: real)
+    {
+        x > 0.0
+    }
+
+    predicate IsRefinement(P1: Partition, P2: Partition)
+    {
+        forall x :: x in P1.s ==> x in P2.s
+    }
+
+    predicate CommonRefinement(P1: Partition, P2: Partition, P: Partition)
+    {
+        IsRefinement(P1, P) && IsRefinement(P2, P)
+    }
+
+    lemma Lemma_zero_two_two_i(f: real -> real, a: real, b: real, P: Partition, P2: Partition)
+        requires a < b
+        requires isBounded(f, a, b)
+        requires PartitionOf(a,b, P)
+        requires PartitionOf(a,b, P2)
+        requires IsRefinement(P, P2)
+        ensures LowerSumAlt(f, P, a, b) <= LowerSumAlt(f, P2, a, b) <= UpperSumAlt(f, P2, a, b) <= UpperSumAlt(f, P, a, b)
+
+    lemma Lemma_zero_two_two_ii(f: real -> real, a: real, b: real, P1: Partition, P2: Partition)
+        requires a < b
+        requires isBounded(f, a, b)
+        requires PartitionOf(a,b, P1)
+        requires PartitionOf(a,b, P2)
+        ensures LowerSumAlt(f, P1, a, b) <= UpperSumAlt(f, P2, a, b)
+
+    lemma Corollary_zero_two_three(f: real -> real, a: real, b: real)
+        requires a < b
+        requires isBounded(f, a, b)
+        ensures LowerIntegral(f, a, b) <= UpperIntegral(f, a, b)
+    
+    lemma valApproachingZero(a: real, b: real)
+        requires forall epsilon :: positive(epsilon) ==> a <= b + epsilon
+        ensures a <= b
+    {
+        if a > b {
+            var diff := a - b;
+            assert diff > 0.0;
+            assert positive(diff/2.0);
+            assert a <= b + diff/2.0;
+            assert false;
+        }
+
+    }
+
+    lemma Theorem_zero_two_four_forward(f: real -> real, a: real, b: real)
+        requires a < b
+        requires isBounded(f, a, b)
+        requires forall epsilon :: positive(epsilon) ==> exists P :: SumDiffLessThanEpsilon(f, P,  a, b, epsilon)
+        ensures RiemannIntegrable(f, a, b)
+    {
+        var M :| M > 0.0 && isBoundedBetween(f, a, b, M);
+        var allPartitions := iset P | PartitionOf(a,b, P);
+        var allPartitionSumsUpper := iset P | P in allPartitions :: UpperSumAlt(f, P, a, b);
+        var allPartitionSumsLower := iset P | P in allPartitions :: LowerSumAlt(f, P, a, b);
+        var canonical_P := Partition([a, b], {a, b});
+        forall epsilon | positive(epsilon)
+            ensures UpperIntegral(f, a, b) <= LowerIntegral(f, a, b) + epsilon
+        {
+                assert positive(epsilon);
+                var P :| SumDiffLessThanEpsilon(f, P, a, b, epsilon);
+                assert UpperSumAlt(f, P, a, b) - LowerSumAlt(f, P, a, b) < epsilon;
+                assert P in allPartitions;
+                assert UpperSumAlt(f, P, a, b) in allPartitionSumsUpper;
+                assert LowerSumAlt(f, P, a, b) in allPartitionSumsLower;
+                assert LowerSumAlt(f, P, a, b) <= LowerIntegral(f, a, b);
+                assert UpperIntegral(f, a, b) <= UpperSumAlt(f, P, a, b);
+                assert UpperSumAlt(f, P, a, b) < LowerSumAlt(f, P, a, b) + epsilon <= LowerIntegral(f, a, b) + epsilon;
+        }
+        valApproachingZero(UpperIntegral(f, a, b), LowerIntegral(f, a, b));
+        Corollary_zero_two_three(f, a, b);
+        assert RiemannIntegrable(f, a, b);
+    }
+
+    lemma {:vcs_split_on_every_assert } Problem3(f: real -> real, g: real -> real, a: real, b: real)
         requires a < b
         requires isBounded(f, a, b)
         requires isBounded(g, a, b)
@@ -751,7 +809,102 @@ module NelsonCh0 {
         requires RiemannIntegrable(g, a, b)
         requires forall x :: a <= x <= b ==> f(x) <= g(x)
         ensures LowerIntegral(f, a, b) <= LowerIntegral(g, a, b)
-    {}
+    {
+        var Mf :| Mf > 0.0 && isBoundedBetween(f,a,b,Mf);
+        var Mg :| Mg > 0.0 && isBoundedBetween(g,a,b,Mg);
+        var allPartitions := iset P | PartitionOf(a,b, P);
+
+        var canonical_P := Partition([a, b], {a, b});
+        var msf := funcRange(f, a, b);
+        var msg := funcRange(g, a, b);
+        assert f(a) in msf;
+        assert g(a) in msg;
+        BoundedAbove(f, a, b, a, b, Mf);
+        BoundedAbove(g, a, b, a, b, Mg);
+        BoundedBelow(f, a, b, a, b, Mf);
+        BoundedBelow(g, a, b, a, b, Mg);
+        assert upperBound(msf, Mf);
+        assert lowerBound(msf, -Mf);
+        var msf_sup := supremum(msf, f(a), Mf);
+        var msf_inf := infimum(msf, f(a), -Mf);
+        var msg_sup := supremum(msg, g(a), Mg);
+        var msg_inf := infimum(msg, g(a), -Mg);
+        // Prop_zero_one_six()
+        // forall P | P in allPartitions
+        //     ensures LowerSumAlt(f, P, a, b) <= LowerSumAlt(g, P, a, b)
+            
+        // {
+        //     Prop_zero_one_six(f, P, a, b, msf_inf, msf_sup);
+        //     Prop_zero_one_six(g, P, a, b, msg_inf, msg_sup);
+        // }
+        // assert forall P | P in allPartitions :: LowerSumAlt(f, P, a, b) <= LowerSumAlt(g, P, a, b);
+        assert msf_sup <= msg_sup by {
+            if msf_sup > msg_sup {
+                var diff := msf_sup - msg_sup;
+                assert diff > 0.0;
+                assert positive(diff/2.0);
+                assert msf_sup > msg_sup + diff/2.0;
+                assert upperBound(msg, msg_sup + diff/2.0);
+                assert !upperBound(msf, sub(msf_sup , diff/2.0));
+                var z :| a <= z <= b && f(z) > sub(msf_sup, diff/2.0) && f(z) in msf;
+                var gz := g(z);
+                assert gz in msg;
+                assert gz > msg_sup + diff/2.0;
+                assert false;
+            }
+        }
+
+    
+        var x := UpperSumAlt(f, canonical_P, a, b);
+        var allPartitionLowerSumsF := iset P | P in allPartitions :: LowerSumAlt(f, P, a, b);
+        var allPartitionLowerSumsG := iset P | P in allPartitions :: LowerSumAlt(g, P, a, b);
+
+        var allPartitionUpperSumsF := iset P | P in allPartitions :: UpperSumAlt(f, P, a, b);
+        var allPartitionUpperSumsG := iset P | P in allPartitions :: UpperSumAlt(g, P, a, b);
+        // forall sum | sum in allPartitionUpperSumsF 
+        //     ensures sum >= prod(-Mf, sub(b,a))
+        //     ensures sum <= prod(Mf, sub(b,a))
+        // {
+        //     var P :| P in allPartitions && sum == UpperSumAlt(f, P, a, b);
+        //     AllPartitionSetBoundedUpper(f, a, b, Mf, P);
+        //     Prop_zero_one_six(f, P, a, b, msf_inf, msf_sup);
+        //     SupLTEBound(f, P, a, b, Mf, msf_sup);
+        //     prodLessThan(msf_sup, sub(b,a), Mf);
+        //     assert UpperSumAlt(f, P, a, b) <= prod(msf_sup, sub(b,a)) <= prod(Mf, sub(b,a));
+
+        // }
+        forall sum | sum in allPartitionUpperSumsF 
+            ensures prod(msf_inf, sub(b,a)) <= sum <= prod(msf_sup, sub(b,a))
+        {
+            var P :| P in allPartitions && sum == UpperSumAlt(f, P, a, b);
+            Prop_zero_one_six(f, P, a, b, msf_inf, msf_sup);
+        }
+        forall sum | sum in allPartitionUpperSumsG 
+            ensures sum >= prod(msg_inf, sub(b,a))
+            ensures sum <= prod(msg_sup, sub(b,a))
+        {
+            var P :| P in allPartitions && sum == UpperSumAlt(g, P, a, b);
+            Prop_zero_one_six(g, P, a, b, msg_inf, msg_sup);
+        }
+
+        forall sum | sum in allPartitionLowerSumsF 
+            ensures prod(msf_inf, sub(b,a)) <= sum <= prod(msf_sup, sub(b,a))
+        {
+            var P :| P in allPartitions && sum == LowerSumAlt(f, P, a, b);
+            Prop_zero_one_six(f, P, a, b, msf_inf, msf_sup);
+        }
+        forall sum | sum in allPartitionLowerSumsG 
+            ensures prod(msg_inf, sub(b,a)) <= sum <= prod(msg_sup, sub(b,a))
+        {
+            var P :| P in allPartitions && sum == LowerSumAlt(g, P, a, b);
+            Prop_zero_one_six(g, P, a, b, msg_inf, msg_sup);
+        }
+        var fsuminf := infimum(allPartitionLowerSumsF, LowerSumAlt(f, canonical_P, a,b), prod(msf_inf, sub(b,a)));
+        var fsumsup := supremum(allPartitionUpperSumsF, UpperSumAlt(f, canonical_P, a,b), prod(msf_sup, sub(b,a)));
+        var gsuminf := infimum(allPartitionLowerSumsG, LowerSumAlt(g, canonical_P, a,b), prod(msg_inf, sub(b,a)));
+        var gsumsup := supremum(allPartitionUpperSumsG, UpperSumAlt(g, canonical_P, a,b), prod(msg_sup, sub(b,a)));
+        assert LowerIntegral(f, a, b) <= LowerIntegral(g, a, b);
+    }
 
     lemma {:verify } {:vcs_split_on_every_assert} Problem5a(f: real -> real, a: real, b: real, c: real) returns (g: real -> real)
         requires a < b
