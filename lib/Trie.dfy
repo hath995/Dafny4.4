@@ -432,7 +432,7 @@ module Tries {
         lemma SpineRepr(root: Trie, spine: seq<Trie>)
             requires root.Valid()
             requires |spine| > 0
-            requires spine[0] == this
+            requires spine[0] == root
             requires forall x :: x in spine ==> x.Valid()
             requires forall i :: 1 <= i < |spine| ==> spine[i] in spine[i-1].children.Values
             ensures forall i,j :: 0 <= i < j < |spine| ==> spine[j].repr < spine[i].repr
@@ -471,33 +471,127 @@ module Tries {
             }
         }
 
+        lemma SpineSetDistinct(spine: seq<Trie>, spineSet: set<Trie>)
+            requires |spine| > 0
+            requires forall x :: x in spine ==> x.Valid()
+            requires forall x :: x in spine ==> x in spineSet
+            requires forall x :: x in spineSet ==> x in spine
+            requires forall i :: 1 <= i < |spine| ==> spine[i] in spine[i-1].children.Values
+            ensures forall i,j :: 0 <= i < j < |spine| ==> spine[j] != spine[i]
+            decreases |spine|
+        {
+            if |spine| <= 1 {
+
+            }else{
+                assert spine == [spine[0]] + spine[1..];
+                SpineRepr(spine[0], spine);
+                SpineSetDistinct(spine[1..], spineSet-{spine[0]});
+            }
+        }
+
+        lemma currentChildUnionNotInSpineSet(root: Trie, current: Trie, spine: seq<Trie>, spineSet: set<Trie>)
+            requires current.Valid()
+            requires |spine| > 0
+            requires forall x :: x in spine ==> x.Valid()
+            requires forall x :: x in spine ==> x in spineSet
+            requires forall x :: x in spineSet ==> x in spine
+            requires current == spine[|spine| - 1]
+            requires |spine| > 0 ==> spine[0] == root
+            requires forall i :: 1 <= i < |spine| ==> spine[i] in spine[i-1].children.Values
+            ensures current.children.Values !! spineSet
+            ensures current.ChildUnion() !! spineSet
+            decreases root.repr
+        {
+            if |spine| == 1 {
+                assert current == root;
+                assert current !in current.ChildUnion();
+                assert current.children.Values < current.repr;
+                assert current.children.Values <= current.ChildUnion();
+                assert current.children.Values !! spineSet;
+                assert current.ChildUnion() !! spineSet;
+            }else{
+                SpineSetDistinct(spine, spineSet);
+                SpineRepr(spine[0], spine);
+                assert current != root;
+                currentChildUnionNotInSpineSet(spine[1], current, spine[1..], spineSet-{root});
+            }
+        }
+
+        // twostate lemma {:verify false} FixupSpineset(spine: seq<Trie>, spineSet: set<Trie>, current: Trie, k: int, child: Trie)
+        //     requires |spine| > 0
+        //     requires child.Valid()
+        //     requires child.children.Values == {}
+        //     requires old(current.Valid())
+        //     requires current.children.Values == old(current.children.Values) + {child}
+        //     requires current.repr == old(current.repr) + child.repr
+        //     requires child in current.repr
+        //     requires current.Valid()
+        //     requires forall i :: 1 <= i < |spine| ==> spine[i] in spine[i-1].children.Values
+        //     requires forall i,j :: 0 <= i < j < |spine| ==> spine[j].repr < spine[i].repr
+        //     requires forall i :: 0 <= i < |spine| ==> old(spine[i].Valid())
+        //     requires forall x :: x in spine ==> x in spineSet
+        //     requires forall x :: x in spineSet ==> x in spine
+        //     requires 0 <= k < |spine|
+        //     requires forall i :: 0 <= i < |spine|-1 ==> child !in old(spine[i].repr)
+        //     requires forall i :: 0 <= i < |spine|-1 ==> child.repr !! old(spine[i].repr)
+        //     requires forall node :: node in spine[(k+1)..] ==> node.Valid()
+        //     requires forall node :: node in spine[k..] ==> node.repr == old(node.repr) + child.repr
+        //     requires forall node :: node in spine[k..] ==> node.children.Values == old(node.children.Values)
+        //     requires current.children.Values !! spineSet
+        //     requires current == spine[|spine| - 1] 
+        //     ensures forall node :: node in spine[k..] ==> node.Valid()
+        // {
+        //     if k == |spine| - 1 {
+        //         assert spine[k] == current;
+        //         assert child in current.repr;
+        //         assert child in spine[k].repr;
+        //         assert spine[k].Valid();
+        //         assert forall node :: node in spine[k..] ==> node.Valid();
+        //     } else {
+        //         assert spine[k].repr == old(spine[k].repr) + {child};
+        //         assert spine[k].Valid() by {
+        //             assert spine[k] in spine[k].repr;
+        //             assert spine[k] !in spine[k].children.Values;
+        //             assert spine[k].children.Values != {};
+        //             assert spine[k].children.Values < spine[k].repr;
+        //             // assert forall x :: x in spine[k].children.Values ==> x.repr !! child.repr; 
+        //             assert forall node :: node in spine[(k+1)..] ==> node.ChildUnion() == old(spine[j].ChildUnion()) + child.repr;
+        //             assert spine[k] !in spine[k].ChildUnion();
+        //             assert spine[k].repr == {spine[k]}+ spine[k].ChildUnion();
+        //         }
+        //         assert forall node :: node in spine[k..] ==> node.Valid();
+        //         // FixupSpineset(spine, spineSet, current, k-1, child);
+        //         // assert spine[k].repr == old(spine[k].repr) + {child};
+        //         // assert child in spine[k].repr;
+        //         // assert spine[k].Valid();
+        //     }
+        // }
+
         method {:verify } {:vcs_split_on_every_assert} insert(word: string)
             requires this.Valid()
             ensures this.Valid()
             modifies this, repr, children.Values, ChildUnion()
         {
             var current := this;
-            ghost var allTries := this.repr;
+            // ghost var allTries := this.repr;
             ghost var spine: seq<Trie> := [this];
             ghost var spineSet: set<Trie> := {this};
             ghost var reprSpine: set<Trie> := {this};
             assert this.ChildUnion() < this.repr;
             ValidImpliesAllValid(this);
-            assert children.Values < allTries;
+            // assert children.Values < allTries;
             ghost var added: set<Trie> := {};
             assert forall x :: x in repr ==> allocated(x);
+            label LoopStart:
             for i := 0 to |word| 
-                invariant forall x :: x in repr ==> x in old(repr) || x in added
                 invariant repr == old(repr) + added
-                // invariant forall x :: x in repr ==> allocated(x)
                 invariant forall y :: y in added ==> fresh(y)
-                invariant forall x :: x in added ==> x.repr < allTries
-                invariant forall x :: x in allTries ==> x in old(repr) + added
+                invariant forall x :: x in added ==> x.repr < repr
                 invariant forall x :: x in reprSpine ==> x in old(repr)
                 invariant spineSet == reprSpine + added
                 invariant reprSpine !! added
                 invariant |spine| > 0
-                invariant forall x :: x in spine ==> x in allTries
+                invariant forall x :: x in spine ==> x in repr
                 invariant current == spine[|spine| - 1]
                 invariant |spine| > 0 ==> spine[0] == this
                 invariant forall i :: 1 <= i < |spine| ==> spine[i] in spine[i-1].children.Values
@@ -509,32 +603,26 @@ module Tries {
                 invariant old(this.repr) <= this.repr
                 // invariant current in old(this.repr) ==> added == {}
                 // invariant current in old(this.repr) ==> forall node :: node in old(this.repr) ==> unchanged(node)
-                invariant current.children.Values < allTries
+                invariant current.children.Values < repr
                 invariant current.children.Values !! spineSet
-                invariant repr <= allTries
-                invariant this in allTries
-                invariant current in allTries
                 invariant current.Valid()
                 invariant this.Valid()
-                invariant forall node :: node in allTries ==> node.Valid()
-                // modifies allTries
+                invariant forall node :: node in repr ==> node.Valid()
                 modifies repr
-                modifies current
-                modifies current.children.Values
             {
                 if word[i] in current.children {
-                    assert current in allTries;
+                    // assert current in allTries;
                     assert word[i] in current.children.Keys;
                     var childTrie := current.children[word[i]];
                     if childTrie in repr {
                     assert childTrie in current.children.Values;
                     AllChildrenInRepr(this, childTrie);
-                    assert current.children[word[i]].repr  <= allTries;
+                    // assert current.children[word[i]].repr  <= allTries;
                     } else {
                         assert childTrie in added;
                         assert childTrie !in repr;
                         assert childTrie in current.children.Values;
-                        assert current.children[word[i]].repr  < allTries;
+                        // assert current.children[word[i]].repr  < allTries;
                     }
                     current := current.children[word[i]];
                     spine := spine + [current];
@@ -543,47 +631,18 @@ module Tries {
                         reprSpine := reprSpine + {current};
                     }
                     SpineRepr(this, spine);
-                    assert current.children.Values < allTries;
-                    assert forall x :: x in allTries ==> x.Valid();
+                    // assert current.children.Values < allTries;
+                    // assert forall x :: x in allTries ==> x.Valid();
                     // CurrentChildrenNotInSpineSet(this, current, spine, spineSet, reprSpine, added);
                 } else {
-                    ghost var oldAllTries := allTries;
                     var child := new Trie();
-                    assert fresh(child);
-                    assert child !in allTries; 
-                    assert forall x :: x in allTries ==> x.Valid();
                     added := added + {child};
-                    allTries := allTries + {child};
                     label BeforeUpdate:
-                    // assert current in repr || current in added;
-                    // if current !in repr {
-                    //     assert current in added;
-                    //     assert current.children.Values < allTries;
-                    // }else{
-                    //     assert current in repr;
-                    //     assert current.children.Values < allTries;
-                    // }
-                    assert child.Valid();
                     ghost var oldc := current.children;
                     var updatedChildren := current.children[word[i] := child];
                     assert updatedChildren[word[i]] == child;
                     assert child in updatedChildren.Values;
                     current.children := updatedChildren;
-                    // for k := 0 to |spine| 
-                    //     invariant forall x :: x in spine[0..k] ==> child in x.repr
-                    // {
-                    //     if spine[k] in repr {
-                    //         assert spine[k] in allTries;
-                    //         AllChildrenInRepr(this, spine[k]);
-                    //         assert spine[k].repr <= allTries;
-                    //         // assert spine[i].Valid();
-                    //     } else {
-                    //         assert spine[k] in added;
-                    //         assert spine[k].repr <= allTries;
-                    //         // assert spine[i].Valid();
-                    //     }
-                    //    spine[k].repr := spine[k].repr + {child};
-                    // }
                     if oldc.Values == {} {
                         assert current.children.Values == {child};
                     } else {
@@ -592,47 +651,54 @@ module Tries {
                         assert forall x :: x in oldc.Values ==> x in current.children.Values;
                         assert current.children.Values == oldc.Values+{child};
                     }
-                    assert current.children.Values < allTries;
+                    // assert current.children.Values < allTries;
                     current.repr := current.repr + {child};
                     UpdatedCurrentValid@BeforeUpdate(current, child, updatedChildren, word[i]);
                     assert current.repr == old@BeforeUpdate(current.repr) + {child};
                     assert child in current.repr;
                     assert current.Valid();
-                    label AfterUpdate:
-                    var k := |spine| - 1;
-                    ghost var rechanged: set<Trie> := {};
-                    while k >= 0
-                        invariant -1 <= k < |spine|
-                        invariant spine[|spine|-1] == current
-                        invariant unchanged@AfterUpdate(current) 
-                        // invariant current.repr !! 
-                        invariant rechanged < spineSet
-                        invariant forall node :: node in old@AfterUpdate(repr)- spineSet ==> unchanged@AfterUpdate(node)
-                        invariant forall x :: x in spine[(k+1)..] ==> child in x.repr
-                        invariant forall x :: x in spine[(k+1)..] ==> x.Valid()
-                        invariant forall x :: x in (repr - spineSet) ==> (x in old@AfterUpdate(this.repr) && unchanged@AfterUpdate(x))
-                    {
-                        if k == |spine| -1 {
-                            assert spine[k] == current;
-                            assert child in spine[k].repr;
-                            assert spine[k].Valid();
-                        } else {
-                            rechanged := rechanged + {spine[k]};
-                            spine[k].repr := spine[k].repr + {child};
-                            assert spine[k].Valid();
-                        }
-                        // if spine[k] in repr {
-                        //     assert spine[k] in allTries;
-                        //     AllChildrenInRepr(this, spine[k]);
-                        //     assert spine[k].repr <= allTries;
-                        //     // assert spine[i].Valid();
-                        // } else {
-                        //     assert spine[k] in added;
-                        //     assert spine[k].repr <= allTries;
-                        //     // assert spine[i].Valid();
-                        // }
-                       k := k - 1;
-                    }
+                    // currentChildUnionNotInSpineSet@BeforeUpdate(this, current, spine, spineSet, child);
+                    currentChildUnionNotInSpineSet(this, current, spine, spineSet);
+                    assert spineSet * current.repr == {current};
+                    // label AfterUpdate:
+                    // ghost var allTheRest := repr - spineSet - current.ChildUnion();
+                    // ghost var unchangedChildren: set<Trie> := current.ChildUnion() - {child};
+                    // assert forall x :: x in unchangedChildren ==> unchanged@BeforeUpdate(x);
+                    // var k := |spine| - 1;
+                    // ghost var rechanged: set<Trie> := {};
+                    // while k >= 0
+                    //     invariant -1 <= k < |spine|
+                    //     invariant spine[|spine|-1] == current
+                    //     // invariant current.repr !! 
+                    //     invariant rechanged <= spineSet
+                    //     invariant forall x :: x in spine[(k+1)..] ==> x in rechanged
+                    //     invariant forall i :: 1 <= i < |spine| ==> spine[i] in spine[i-1].children.Values
+                    //     invariant k == |spine| - 1 ==> unchangedChildren == current.ChildUnion()-{child}
+                    //     invariant k < |spine| - 1 ==> unchangedChildren == spine[k+1].ChildUnion()-{child}
+                    //     invariant unchanged@AfterUpdate(allTheRest)
+                    //     invariant unchanged@AfterUpdate(unchangedChildren)
+                    //     invariant allTheRest !! unchangedChildren
+                    //     invariant allTheRest + unchangedChildren == repr - spineSet - {child}
+                    //     // invariant forall node :: node in old@BeforeUpdate(repr) - spineSet ==> unchanged@BeforeUpdate(node)
+                    //     invariant forall x :: x in spine[(k+1)..] ==> x.repr == old@BeforeUpdate(x.repr)+{child}
+                    //     invariant forall x :: x in spine[(k+1)..] ==> x.Valid()
+                    //     // invariant forall x :: x in (repr - spineSet) ==> (x in old@AfterUpdate(this.repr) && unchanged@AfterUpdate(x))
+                    // {
+                    //     if k == |spine| -1 {
+                    //         assert spine[k] == current;
+                    //         assert child in current.repr;
+                    //         assert child in spine[k].repr;
+                    //         assert spine[k].Valid();
+                    //         rechanged := rechanged + {spine[k]};
+                    //     } else {
+                    //         rechanged := rechanged + {spine[k]};
+                    //         spine[k].repr := spine[k].repr + {child};
+                    //         allTheRest := allTheRest - (spine[k].ChildUnion()-spine[k+1].repr);
+                    //         unchangedChildren := unchangedChildren + spine[k].ChildUnion()-spine[k+1].repr;
+                    //         assert spine[k].Valid();
+                    //     }
+                    //    k := k - 1;
+                    // }
                     assert spine[0] == this;
                     assert spine[0].Valid();
                     ValidImpliesAllValid(this);
@@ -642,11 +708,12 @@ module Tries {
                     if current in old(repr) {
                         reprSpine := reprSpine + {current};
                     }
+                    assert child in spine[|spine|-2].children.Values;
                     SpineRepr(this, spine);
                     // CurrentChildrenNotInSpineSet(this, current, spine, spineSet, reprSpine, added);
                 }
             }
-            assert current in allTries;
+            // assert current in allTries;
             current.isWord := true;
         }
     }

@@ -446,6 +446,7 @@ lemma AllDescPathCont(root: Tree, start: Tree, end: Tree, path: seq<Tree>, k: in
             }
             assert false;
         }
+        assert path[k-1..] == path[(k-1)..][..(i+1)];
         DescPathChildrenAlt(path[(k-1)..][..(i+1)], path[k-1], path[(k-1)..][i]);
         assert isDescTreePath(path[(k-1)..][..(i+1)], path[k-1], path[(k-1)..][i]);
     }else{
