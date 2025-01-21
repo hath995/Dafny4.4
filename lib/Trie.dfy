@@ -17,7 +17,6 @@ module Tries {
     lemma UnionPlusSuperset<T>(s: set<set<T>>, x: set<T>, y: set<T>)
         requires x <= y
         requires x in s
-        // requires y !in s
         requires forall y :: y in s ==> y != {}
         ensures Union(s)+y == Union(s-{x} + {y})
         decreases s
@@ -179,21 +178,15 @@ module Tries {
     function InsertWord(t: Trie2, word: string): Trie2
         decreases |word|
     {
-        if |word| == 0 then
+        if |word| == 0 && t.isWord then
             t
-         else if |word| == 1 then
-            if word[0] in t.children && t.children[word[0]].isWord then
-                t
-            else 
-                Trie2(t.children[word[0] := Trie2(map[], true)], t.isWord)
-         else
+        else if |word| == 0 && !t.isWord then
+            Trie2(t.children, true)
+        else
             if word[0] in t.children then
                 Trie2(t.children[word[0] := InsertWord(t.children[word[0]], word[1..])], t.isWord)
             else
                 Trie2(t.children[word[0] := InsertWord(Trie2(map[], false), word[1..])], t.isWord)
-            // var child := new Trie();
-            // children := children[word[0] := child];
-            // return child.insert(word[1..]);
     }
 
     lemma ThereIsAMinimum(s: set<char>)
@@ -255,7 +248,6 @@ module Tries {
             new;
             assert this !in this.children.Values;
             repr := {this};
-            // assert TrieSet(this) == {this};
         }
 
         ghost function ChildUnion() : set<Trie> 
@@ -329,34 +321,19 @@ module Tries {
             decreases repr
         {
             this in this.repr &&
-            // this !in this.children.Values &&
-            // this.children.Values <= this.repr &&
-            // (forall x,y :: x in this.children.Values && y in this.children.Values && x != y ==> x.repr !! y.repr) &&
-            // (
-            //     forall x :: x in this.children.Values ==> (
-            //         this !in x.repr && 
-            //         x.repr <= this.repr &&
-            //         x.Valid()
-            //     )
-            // )
             (
                 forall x <- this.children.Keys :: (
                     this.children[x] in this.repr &&
                     this.children[x].repr <= this.repr &&
-                    // this != this.children[x] &&
                     this !in this.children[x].repr && 
                     this.children[x].Valid()
                 )
             ) &&
             (forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y]) &&
             (forall x <- this.children.Keys, y <- this.children.Keys :: this.children[x] != this.children[y] ==> this.children[x].repr !! this.children[y].repr) &&
-            // && (forall node :: node in this.repr ==> (node == this || exists k :: k in this.children.Keys && node in this.children[k].repr ))
             (this.children.Keys == {} ==> this.repr == {this}) &&
             (this.children.Keys != {} ==> this.repr == {this}+Union(set k | k in this.children.Keys :: this.children[k].repr)) &&
             (forall word :: word in this.words && |word| > 0 ==> word[0] in this.children.Keys)
-            //     forall word :: word in this.words ==> this.has(word)
-            //     ) &&
-            // (forall key :: key in this.children.Keys ==> forall childWords :: childWords in this.children[key].words ==> this.has([key] + childWords))
         }
 
         ghost predicate ValidWords()
@@ -365,16 +342,13 @@ module Tries {
             decreases repr
         {
             (forall word :: word in this.words ==> this.has(word))  &&
-            // (forall key :: key in this.children.Keys ==> forall childWords :: childWords in this.children[key].words ==> this.children[key].has(childWords)) &&
             (forall key :: key in this.children.Keys ==> this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..]) &&
             (forall key :: key in this.children.Keys ==> this.children[key].ValidWords()) &&
-            // required for ValidNotTrieInWords
+            // required for TrieDoesNotHaveWord
             ("" in this.words <==> this.isWord)
-            // ("" in this.words ==> this.isWord) &&
-            // ("" !in this.words ==> !this.isWord)
         }
 
-        lemma ValidTrieNotInWords( word: string)
+        lemma TrieDoesNotHaveWord( word: string)
             requires Valid()
             requires ValidWords()
             requires word !in this.words
@@ -392,7 +366,7 @@ module Tries {
                             assert false;
                         }
                     }
-                    this.children[word[0]].ValidTrieNotInWords( word[1..]);
+                    this.children[word[0]].TrieDoesNotHaveWord( word[1..]);
                 } else {
                     assert word[0] !in this.children.Keys;
                     assert this.has(word) == false;
@@ -400,6 +374,19 @@ module Tries {
             } else {
                 assert this.isWord == false;
                 assert this.has(word) == false;
+            }
+        }
+
+        lemma WordsNotInWordsTrieDoesNotHave()
+            requires Valid()
+            requires ValidWords()
+            ensures forall word :: word !in this.words ==> this.has(word) == false
+            decreases this.repr
+        {
+            forall word | word !in this.words
+                ensures this.has(word) == false
+            {
+                TrieDoesNotHaveWord(word);
             }
         }
 
@@ -962,8 +949,9 @@ module Tries {
             trie.insertRecursive("boo");
             assert trie.has("hello");
             assert trie.has("boo");
-            trie.ValidTrieNotInWords("book");
+            trie.WordsNotInWordsTrieDoesNotHave();
             assert !trie.has("book");
+            assert !trie.has("foobar");
         }
     }
 }
