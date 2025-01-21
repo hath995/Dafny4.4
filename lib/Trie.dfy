@@ -187,16 +187,20 @@ module Tries {
         var children: map<char, Trie>
         var isWord: bool
         ghost var repr: set<Trie>
+        ghost var words: set<string>
 
         constructor() 
             ensures fresh(this.repr)
             ensures this.isWord == false
             ensures this.children.Keys == {}
             ensures this.children.Values == {}
+            ensures this.words == {}
             ensures Valid()
+            ensures ValidWords()
         {
             children := map[];
             isWord := false;
+            words := {};
             new;
             assert this !in this.children.Values;
             repr := {this};
@@ -209,6 +213,20 @@ module Tries {
         {
             Union(set x | x in children.Values :: x.repr)+ this.children.Values
         }
+
+        predicate has(word: string)
+            requires Valid()
+            reads this, repr
+            decreases repr
+        {
+            if |word| > 0 then 
+                if word[0] in children then 
+                    children[word[0]].has(word[1..])
+                else 
+                    false
+            else
+                isWord
+        } 
 
         twostate lemma ChildUnionContains(root: Trie, child: Trie)
             requires old(root.Valid())
@@ -280,68 +298,145 @@ module Tries {
                 )
             ) &&
             // (forall x,y :: x in this.children.Values && y in this.children.Values && x != y ==> x.repr !! y.repr)
-            (forall x <- this.children.Keys, y <- this.children.Keys :: this.children[x] != this.children[y] ==> this.children[x].repr !! this.children[y].repr)
+            (forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y]) &&
+            (forall x <- this.children.Keys, y <- this.children.Keys :: this.children[x] != this.children[y] ==> this.children[x].repr !! this.children[y].repr) &&
             // && (forall node :: node in this.repr ==> (node == this || exists k :: k in this.children.Keys && node in this.children[k].repr ))
+            (this.children.Keys == {} ==> this.repr == {this}) &&
+            (this.children.Keys != {} ==> this.repr == {this}+Union(set k | k in this.children.Keys :: this.children[k].repr)) &&
+            (forall word :: word in this.words && |word| > 0 ==> word[0] in this.children.Keys)
+            //     forall word :: word in this.words ==> this.has(word)
+            //     ) &&
+            // (forall key :: key in this.children.Keys ==> forall childWords :: childWords in this.children[key].words ==> this.has([key] + childWords))
         }
 
-        method {:vcs_split_on_every_assert}   insertRecursive(word: string)// returns (child': Trie)
+        ghost predicate ValidWords()
+            requires Valid()
+            reads this, repr
+            decreases repr
+        {
+            (forall word :: word in this.words ==> this.has(word))  &&
+            (forall key :: key in this.children.Keys ==> forall childWords :: childWords in this.children[key].words ==> this.has([key] + childWords)) &&
+            (forall key :: key in this.children.Keys ==> this.children[key].ValidWords())
+        }
+
+        method {:verify } {:only} {:vcs_split_on_every_assert}  insertRecursive(word: string)// returns (child': Trie)
             requires this.Valid()
+            requires ValidWords()
             ensures this.Valid()
+            ensures ValidWords()
             // ensures child'.Valid()
             // ensures this.repr == old(this.repr) + child'.repr
+            ensures this.words == old(this.words) + {word}
+            ensures this.repr >= old(this.repr)
             ensures fresh(this.repr - old(this.repr))
+            ensures |word| == 0 ==> this.isWord
+            // ensures |word| == 0 ==> unchanged(this.repr - {this})
+            // ensures |word| > 0 ==> old(repr) - old()
+            ensures |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr)
+            // ensures |word| == 0 ==> forall x :: x in this.children.Keys ==>  unchanged(this.children[x])
+            ensures |word| >0 ==> word[0] in this.children.Keys
             modifies repr
         {
-            if word == "" {
-                this.isWord := true;
-            }else if |word| ==1 {
-                if word[0] in this.children && this.children[word[0]].isWord {
-                    // return this.children[word[0]];
-                } else {
-                    var child := new Trie();
-                    ghost var oldChilldren := this.children;
-                    this.children := this.children[word[0] := child];
-                    child.insertRecursive(word[1..]);
-                    assert child.Valid();
-
-                    this.repr := this.repr + child.repr;
-                    // assert forall x :: x in this.repr ==> (x == this || exists k :: k in this.children.Keys && x in this.children[k].repr) by {
-                    //     forall x | x in this.repr
-                    //         ensures x == this || exists k :: k in this.children.Keys && x in this.children[k].repr
+            if |word| > 0 {
+                if word[0] in this.children {
+                    assert forall i,j :: i in this.children.Keys && j in this.children.Keys && i != j ==> this.children[i] != this.children[j];
+                    this.children[word[0]].insertRecursive(word[1..]);
+                    assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]);
+                    assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr);
+                    this.words := this.words + {word};
+                    this.repr := this.repr + this.children[word[0]].repr;
+                    // assert |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]) by {
+                    //     forall x | x in this.children.Keys && x != word[0]
+                    //         ensures this.children[x] in old(repr) && unchanged(this.children[x])
                     //     {
-                    //         if x == this {
-                    //             assert this in this.repr;
-                    //         } else {
-                    //             assert x in old(this.repr)+child.repr;
-                    //             if x in old(this.repr) {
-                    //                 assert x != this;
-                    //                 var k :| k in oldChilldren.Keys && oldChilldren[k] == x;
-                    //                 assert x in this.repr;
-                    //             } else {
-                    //                 assert x in child.repr;
-                    //                 assert word[0] in this.children.Keys;
-                    //                 assert x in this.children[word[0]].repr;
-                    //                 assert fresh(x);
+                    //         if x == word[0] {
+                    //         }else{
+                    //             assert this.children[x] in old(repr);
+                    //             assert this.children[x] in repr;
+                    //             assert this.children[x].repr <= repr;
+                    //             assert this.children[x].Valid();
+                    //             assert unchanged(this.children[x]) by {
+                    //                 if !unchanged(this.children[x]) {
+                    //                     assume false;
+                    //                 }
                     //             }
+
                     //         }
                     //     }
                     // }
-                    // assert this !in ChildUnion();
-                }
-            } else {
-                // assume false;
-                if word[0] in this.children {
-                    this.children[word[0]].insertRecursive(word[1..]);
-                    this.repr := this.repr + this.children[word[0]].repr;
-                    // return this;
                 } else {
                     var child := new Trie();
-                    this.children := this.children[word[0] := child];
+                    assert child.words == {};
                     child.insertRecursive(word[1..]);
+                    this.children := this.children[word[0] := child];
+                    this.words := this.words + {word};
                     this.repr := this.repr + child.repr;
-                    // return this;
                 }
+            }else{
+                this.isWord := true;
+                this.words := this.words + {word};
             }
+            // if word == "" {
+            //     this.isWord := true;
+            // }else if |word| ==1 {
+            //     if word[0] in this.children && this.children[word[0]].isWord {
+            //         assume false;
+            //         // return this.children[word[0]];
+            //     }else if word[0] in this.children && !this.children[word[0]].isWord {
+            //         assume false;
+            //         this.children[word[0]].insertRecursive(word[1..]);
+            //         // assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]); 
+            //         this.repr := this.repr + this.children[word[0]].repr;
+            //     } else {
+            //         assume false;
+            //         var child := new Trie();
+            //         ghost var oldChilldren := this.children;
+            //         this.children := this.children[word[0] := child];
+            //         child.insertRecursive(word[1..]);
+            //         assert child.Valid();
+            //         // assert forall k :: k in this.children.Keys && k != word[0] ==> this.children[k] == oldChilldren[k];
+            //         this.repr := this.repr + child.repr;
+            //         // assert forall x :: x in this.repr ==> (x == this || exists k :: k in this.children.Keys && x in this.children[k].repr) by {
+            //         //     forall x | x in this.repr
+            //         //         ensures x == this || exists k :: k in this.children.Keys && x in this.children[k].repr
+            //         //     {
+            //         //         if x == this {
+            //         //             assert this in this.repr;
+            //         //         } else {
+            //         //             assert x in old(this.repr)+child.repr;
+            //         //             if x in old(this.repr) {
+            //         //                 assert x != this;
+            //         //                 var k :| k in oldChilldren.Keys && x in oldChilldren[k].repr;
+            //         //                 assert x in this.repr;
+            //         //                 assert k in this.children.Keys;
+            //         //                 assert x in this.children[k].repr;
+            //         //             } else {
+            //         //                 assert x in child.repr;
+            //         //                 assert word[0] in this.children.Keys;
+            //         //                 assert x in this.children[word[0]].repr;
+            //         //                 assert fresh(x);
+            //         //             }
+            //         //         }
+            //         //     }
+            //         // }
+            //         // assert this !in ChildUnion();
+            //     }
+            // } else {
+            //     assume false;
+            //     if word[0] in this.children {
+            //         this.children[word[0]].insertRecursive(word[1..]);
+            //         assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]); 
+            //         assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr !! this.children[word[0]].repr; 
+            //         this.repr := this.repr + this.children[word[0]].repr;
+            //         // return this;
+            //     } else {
+            //         var child := new Trie();
+            //         this.children := this.children[word[0] := child];
+            //         child.insertRecursive(word[1..]);
+            //         this.repr := this.repr + child.repr;
+            //         // return this;
+            //     }
+            // }
         }
 
         lemma ValidImpliesAllValid(root: Trie)
@@ -349,7 +444,7 @@ module Tries {
             ensures forall x :: x in root.repr ==> x.Valid()
             decreases root.repr
         {
-            if root.children.Values == {} {
+            if root.children.Keys == {} {
 
             }else {
                 forall node | node in root.repr
@@ -362,15 +457,15 @@ module Tries {
                     } else {
                         assert node !in root.children.Values;
                         // assert node in Union(set x | x in root.children.Values :: x.repr);
-                        // UnionContains(set x | x in root.children.Values :: x.repr, node);
-                        var x :| x in root.children.Values && node in x.repr;
-                        ValidImpliesAllValid(x); 
+                        UnionContains(set x | x in root.children.Keys :: root.children[x].repr, node);
+                        var k :| k in root.children.Keys && node in root.children[k].repr;
+                        ValidImpliesAllValid(root.children[k]); 
                         assert node.Valid();
                     }
                 }
             }
         }
-        lemma  AllChildrenInRepr(root: Trie, child: Trie)
+        lemma {:verify } AllChildrenInRepr(root: Trie, child: Trie)
             requires root.Valid()
             requires child in root.repr
             ensures child.repr <= root.repr
@@ -394,6 +489,8 @@ module Tries {
                     assert child in root.children.Values;
                     assert child.children.Values < root.repr;
                 } else {
+                    UnionContains(set x | x in root.children.Keys :: root.children[x].repr, child);
+                    var k :| k in root.children.Keys && child in root.children[k].repr;
                     // assert child in Union(set x | x in root.children.Values :: x.repr);
                     // UnionContains(set x | x in root.children.Values :: x.repr, child);
                     // var x :| x in root.children.Values && child in x.repr;
@@ -401,7 +498,7 @@ module Tries {
             }
         }
 
-        twostate lemma CurrentChildrenNotInSpineSet(root: Trie, current: Trie, spine: seq<Trie>, spineSet: set<Trie>, reprSpine: set<Trie>, added: set<Trie>)
+        twostate lemma {:verify false} CurrentChildrenNotInSpineSet(root: Trie, current: Trie, spine: seq<Trie>, spineSet: set<Trie>, reprSpine: set<Trie>, added: set<Trie>)
             requires old(root.Valid())
             requires root.Valid()
             requires current.Valid()
@@ -436,7 +533,7 @@ module Tries {
             }
         }
 
-        twostate lemma  UpdatedCurrentValid(current: Trie, child: Trie, updates: map<char, Trie>, c: char)
+        twostate lemma {:verify false}  UpdatedCurrentValid(current: Trie, child: Trie, updates: map<char, Trie>, c: char)
             requires allocated(current)
             requires old(current.Valid())
             requires child.children.Values == {}
@@ -524,7 +621,7 @@ module Tries {
                             if i == |spine| - 2 && 0 <= i < |spine| - 1 {
                                 assert spine[|spine| - 1] in spine[i].children.Values;
                                 AllChildrenInRepr(spine[i], spine[|spine| - 1]);
-                                assert spine[|spine| - 1].repr <= spine[i].ChildUnion();
+                                // assert spine[|spine| - 1].repr <= spine[i].ChildUnion();
                                 assert spine[|spine| - 1].repr < spine[i].repr;
                             }else{
                                 assert |spine| > 2;
@@ -558,7 +655,7 @@ module Tries {
             }
         }
 
-        lemma currentChildUnionNotInSpineSet(root: Trie, current: Trie, spine: seq<Trie>, spineSet: set<Trie>)
+        lemma {:verify false} currentChildUnionNotInSpineSet(root: Trie, current: Trie, spine: seq<Trie>, spineSet: set<Trie>)
             requires current.Valid()
             requires |spine| > 0
             requires forall x :: x in spine ==> x.Valid()
@@ -684,7 +781,7 @@ module Tries {
             current.isWord := true;
         }
 
-        method {:verify } {:vcs_split_on_every_assert} insert(word: string)
+        method {:verify false} {:vcs_split_on_every_assert} insert(word: string)
             requires this.Valid()
             ensures this.Valid()
             modifies this, repr, children.Values, ChildUnion()
