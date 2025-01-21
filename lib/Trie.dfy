@@ -13,6 +13,57 @@ module Tries {
             x + Union(s - {x})
     }
 
+
+    lemma UnionPlusSuperset<T>(s: set<set<T>>, x: set<T>, y: set<T>)
+        requires x <= y
+        requires x in s
+        // requires y !in s
+        requires forall y :: y in s ==> y != {}
+        ensures Union(s)+y == Union(s-{x} + {y})
+        decreases s
+    {
+        if s == {} {
+
+        }else{
+            UnionPlusOne(s-{x}, x);
+            calc{
+                Union(s-{x}+{x});
+                Union(s-{x}) + x;
+                {assert s-{x}+{x} == s;} 
+                Union(s);
+            }
+            // calc {
+            //     Union(s-{x}+{y});
+            //     {UnionPlusOne(s-{x}, y);}
+            //     Union(s-{x}) + y;
+            //     Union(s-{x}) + y + x;
+            //     // Union(s-{x} + {y}) + y;
+            //     Union(s) + y;
+            // }
+            assert Union(s-{x}+{x}) == Union(s-{x}) + x;
+            assert Union(s) == Union(s-{x}) + x;
+            assert Union(s) + y == Union(s-{x}) + x + y;
+            assert Union(s-{x}) + y == Union(s-{x}) + x + y;
+            UnionPlusOneIdempotent(s-{x}, y);
+
+        }
+    }
+
+    lemma UnionPlusOneIdempotent<T>(s: set<set<T>>, x: set<T>)
+        requires x != {}
+        requires forall y :: y in s ==> y != {}
+        ensures Union(s + {x}) == Union(s) + x
+        decreases s
+    {
+        if s == {} {
+        } else if x !in s {
+            UnionPlusOne(s, x);
+        }else{
+            assert s+{x} == s;
+            assert Union(s+{x}) == Union(s);
+            UnionHasAll(s);
+        }
+    }
     lemma UnionPlusOne<T>(s: set<set<T>>, x: set<T>)
         requires x != {}
         requires forall y :: y in s ==> y != {}
@@ -297,7 +348,6 @@ module Tries {
                     this.children[x].Valid()
                 )
             ) &&
-            // (forall x,y :: x in this.children.Values && y in this.children.Values && x != y ==> x.repr !! y.repr)
             (forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y]) &&
             (forall x <- this.children.Keys, y <- this.children.Keys :: this.children[x] != this.children[y] ==> this.children[x].repr !! this.children[y].repr) &&
             // && (forall node :: node in this.repr ==> (node == this || exists k :: k in this.children.Keys && node in this.children[k].repr ))
@@ -315,55 +365,68 @@ module Tries {
             decreases repr
         {
             (forall word :: word in this.words ==> this.has(word))  &&
-            (forall key :: key in this.children.Keys ==> forall childWords :: childWords in this.children[key].words ==> this.has([key] + childWords)) &&
-            (forall key :: key in this.children.Keys ==> this.children[key].ValidWords())
+            // (forall key :: key in this.children.Keys ==> forall childWords :: childWords in this.children[key].words ==> this.children[key].has(childWords)) &&
+            (forall key :: key in this.children.Keys ==> this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..]) &&
+            (forall key :: key in this.children.Keys ==> this.children[key].ValidWords()) &&
+            // required for ValidNotTrieInWords
+            ("" in this.words <==> this.isWord)
+            // ("" in this.words ==> this.isWord) &&
+            // ("" !in this.words ==> !this.isWord)
         }
 
-        method {:verify } {:only} {:vcs_split_on_every_assert}  insertRecursive(word: string)// returns (child': Trie)
+        lemma ValidTrieNotInWords( word: string)
+            requires Valid()
+            requires ValidWords()
+            requires word !in this.words
+            ensures this.has(word) == false
+            decreases this.repr
+        {
+            if |word| > 0 {
+                if word[0] in this.children {
+                    assert word[1..] !in this.children[word[0]].words by {
+                        if word[1..] in this.children[word[0]].words {
+                            assert word[1..] in this.children[word[0]].words;
+                            assert word[1..] in set ws | ws in this.words && |ws| > 0 && ws[0] == word[0] :: ws[1..];
+                            var w :| w in this.words && |w| >0 && w[0] == word[0] && w[1..] == word[1..];
+                            assert w == word;
+                            assert false;
+                        }
+                    }
+                    this.children[word[0]].ValidTrieNotInWords( word[1..]);
+                } else {
+                    assert word[0] !in this.children.Keys;
+                    assert this.has(word) == false;
+                }
+            } else {
+                assert this.isWord == false;
+                assert this.has(word) == false;
+            }
+        }
+
+        method {:verify } {:vcs_split_on_every_assert} insertRecursive(word: string)// returns (child': Trie)
             requires this.Valid()
             requires ValidWords()
             ensures this.Valid()
             ensures ValidWords()
-            // ensures child'.Valid()
-            // ensures this.repr == old(this.repr) + child'.repr
             ensures this.words == old(this.words) + {word}
             ensures this.repr >= old(this.repr)
             ensures fresh(this.repr - old(this.repr))
             ensures |word| == 0 ==> this.isWord
-            // ensures |word| == 0 ==> unchanged(this.repr - {this})
-            // ensures |word| > 0 ==> old(repr) - old()
-            ensures |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr)
-            // ensures |word| == 0 ==> forall x :: x in this.children.Keys ==>  unchanged(this.children[x])
+            // ensures |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr)
             ensures |word| >0 ==> word[0] in this.children.Keys
             modifies repr
         {
             if |word| > 0 {
                 if word[0] in this.children {
-                    assert forall i,j :: i in this.children.Keys && j in this.children.Keys && i != j ==> this.children[i] != this.children[j];
                     this.children[word[0]].insertRecursive(word[1..]);
-                    assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]);
-                    assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr);
                     this.words := this.words + {word};
                     this.repr := this.repr + this.children[word[0]].repr;
-                    // assert |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]) by {
-                    //     forall x | x in this.children.Keys && x != word[0]
-                    //         ensures this.children[x] in old(repr) && unchanged(this.children[x])
-                    //     {
-                    //         if x == word[0] {
-                    //         }else{
-                    //             assert this.children[x] in old(repr);
-                    //             assert this.children[x] in repr;
-                    //             assert this.children[x].repr <= repr;
-                    //             assert this.children[x].Valid();
-                    //             assert unchanged(this.children[x]) by {
-                    //                 if !unchanged(this.children[x]) {
-                    //                     assume false;
-                    //                 }
-                    //             }
-
-                    //         }
-                    //     }
-                    // }
+                    calc {
+                     (set x | x in this.children.Keys :: this.children[x].repr);
+                     (set x | x in this.children.Keys && x != word[0] :: old(this.children[x].repr)) + {this.children[word[0]].repr};
+                     (set x | x in this.children.Keys :: old(this.children[x].repr))-{old(this.children[word[0]].repr)} + {this.children[word[0]].repr};
+                    }
+                    UnionPlusSuperset(set x | x in this.children.Keys :: old(this.children[x].repr), old(this.children[word[0]].repr), this.children[word[0]].repr);
                 } else {
                     var child := new Trie();
                     assert child.words == {};
@@ -371,72 +434,33 @@ module Tries {
                     this.children := this.children[word[0] := child];
                     this.words := this.words + {word};
                     this.repr := this.repr + child.repr;
+                    assert this.children.Keys == old(this.children.Keys) + {word[0]};
+                    assert fresh(child.repr);
+                    assert this.children[word[0]] == child;
+                    assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr !! child.repr;
+                    assert forall x,y :: x in this.children.Keys && y in this.children.Keys && x != y ==> this.children[x] != this.children[y];
+                    assert (set x | x in this.children.Keys && x != word[0] :: this.children[x].repr) == set x | x in this.children.Keys && x != word[0] :: old(this.children[x].repr);
+                    calc {
+                        this.repr;
+                        Union(set x | x in old(this.children.Keys) :: old(this.children[x].repr)) + child.repr + {this};
+                        {assert (set x | x in old(this.children.Keys) :: old(this.children[x].repr)) == (set x | x in this.children.Keys && x != word[0] :: this.children[x].repr);}    
+                        Union(set x | x in this.children.Keys && x != word[0] :: this.children[x].repr) + child.repr+ {this};
+                        {UnionPlusOne(set x | x in this.children.Keys && x != word[0] :: (this.children[x].repr), child.repr);}
+                        Union((set x | x in this.children.Keys && x != word[0] :: this.children[x].repr) + {child.repr}) + {this};
+                        {assert (set x | x in this.children.Keys && x != word[0] :: this.children[x].repr) + {child.repr} == set x | x in this.children.Keys :: this.children[x].repr;}
+                        Union(set x | x in this.children.Keys :: this.children[x].repr)+ {this};
+                    }
+                    // assert this.repr == {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
+                    // assert Valid();
+                    // assert ValidWords();
                 }
             }else{
                 this.isWord := true;
                 this.words := this.words + {word};
+                assert (set x | x in this.children.Keys :: this.children[x].repr) == (set x | x in this.children.Keys :: old(this.children[x].repr));
+                assert Valid();
+                assert ValidWords();
             }
-            // if word == "" {
-            //     this.isWord := true;
-            // }else if |word| ==1 {
-            //     if word[0] in this.children && this.children[word[0]].isWord {
-            //         assume false;
-            //         // return this.children[word[0]];
-            //     }else if word[0] in this.children && !this.children[word[0]].isWord {
-            //         assume false;
-            //         this.children[word[0]].insertRecursive(word[1..]);
-            //         // assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]); 
-            //         this.repr := this.repr + this.children[word[0]].repr;
-            //     } else {
-            //         assume false;
-            //         var child := new Trie();
-            //         ghost var oldChilldren := this.children;
-            //         this.children := this.children[word[0] := child];
-            //         child.insertRecursive(word[1..]);
-            //         assert child.Valid();
-            //         // assert forall k :: k in this.children.Keys && k != word[0] ==> this.children[k] == oldChilldren[k];
-            //         this.repr := this.repr + child.repr;
-            //         // assert forall x :: x in this.repr ==> (x == this || exists k :: k in this.children.Keys && x in this.children[k].repr) by {
-            //         //     forall x | x in this.repr
-            //         //         ensures x == this || exists k :: k in this.children.Keys && x in this.children[k].repr
-            //         //     {
-            //         //         if x == this {
-            //         //             assert this in this.repr;
-            //         //         } else {
-            //         //             assert x in old(this.repr)+child.repr;
-            //         //             if x in old(this.repr) {
-            //         //                 assert x != this;
-            //         //                 var k :| k in oldChilldren.Keys && x in oldChilldren[k].repr;
-            //         //                 assert x in this.repr;
-            //         //                 assert k in this.children.Keys;
-            //         //                 assert x in this.children[k].repr;
-            //         //             } else {
-            //         //                 assert x in child.repr;
-            //         //                 assert word[0] in this.children.Keys;
-            //         //                 assert x in this.children[word[0]].repr;
-            //         //                 assert fresh(x);
-            //         //             }
-            //         //         }
-            //         //     }
-            //         // }
-            //         // assert this !in ChildUnion();
-            //     }
-            // } else {
-            //     assume false;
-            //     if word[0] in this.children {
-            //         this.children[word[0]].insertRecursive(word[1..]);
-            //         assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x] in old(repr) && unchanged(this.children[x]); 
-            //         assert forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr !! this.children[word[0]].repr; 
-            //         this.repr := this.repr + this.children[word[0]].repr;
-            //         // return this;
-            //     } else {
-            //         var child := new Trie();
-            //         this.children := this.children[word[0] := child];
-            //         child.insertRecursive(word[1..]);
-            //         this.repr := this.repr + child.repr;
-            //         // return this;
-            //     }
-            // }
         }
 
         lemma ValidImpliesAllValid(root: Trie)
@@ -930,6 +954,16 @@ module Tries {
             }
             // assert current in allTries;
             current.isWord := true;
+        }
+
+        method Test() {
+            var trie := new Trie();
+            trie.insertRecursive("hello");
+            trie.insertRecursive("boo");
+            assert trie.has("hello");
+            assert trie.has("boo");
+            trie.ValidTrieNotInWords("book");
+            assert !trie.has("book");
         }
     }
 }
