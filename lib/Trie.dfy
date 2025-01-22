@@ -189,6 +189,30 @@ module Tries {
                 Trie2(t.children[word[0] := InsertWord(Trie2(map[], false), word[1..])], t.isWord)
     }
 
+    predicate HasWord(t: Trie2, word: string)
+        decreases |word|
+    {
+        if |word| == 0 then
+            t.isWord
+        else
+            if word[0] in t.children then
+                HasWord(t.children[word[0]], word[1..])
+            else
+                false
+    }
+
+    function DeleteWord(t: Trie2, word: string): Trie2
+        decreases |word|
+    {
+        if |word| == 0 then
+            Trie2(t.children, false)
+        else
+            if word[0] in t.children then
+                Trie2(t.children[word[0] := DeleteWord(t.children[word[0]], word[1..])], t.isWord)
+            else
+                t
+    }
+
     lemma ThereIsAMinimum(s: set<char>)
         requires s != {}
         ensures exists x :: x in s && forall y :: y in s ==> x <= y
@@ -1021,6 +1045,7 @@ module Tries {
         method Test() {
             var trie := new Trie();
             trie.insertRecursive("hello");
+            trie.insertRecursive("hello!");
             trie.insertRecursive("boo");
             assert trie.has("hello");
             assert trie.has("boo");
@@ -1031,6 +1056,22 @@ module Tries {
             trie.WordsNotInWordsTrieDoesNotHave();
             assert !trie.has("hello");
             assert trie.has("boo");
+            assert trie.has("hello!");
+            
+
+        }
+
+        method testTrie2() {
+            var t2 := Trie2(map[], false);
+            t2 := InsertWord(t2, "hello");
+            t2 := InsertWord(t2, "hello!");
+            t2 := InsertWord(t2, "boo");
+            assert HasWord(t2, "hello");
+            assert HasWord(t2, "boo");
+            t2 := DeleteWord(t2, "hello");
+            assert !HasWord(t2, "hello");
+            assert HasWord(t2, "boo");
+            assert HasWord(t2, "hello!");
         }
     }
 }
