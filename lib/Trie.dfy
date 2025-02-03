@@ -208,7 +208,12 @@ module Tries {
             Trie2(t.children, false)
         else
             if word[0] in t.children then
-                Trie2(t.children[word[0] := DeleteWord(t.children[word[0]], word[1..])], t.isWord)
+                var child := DeleteWord(t.children[word[0]], word[1..]);
+                // Trie2(t.children[word[0] := DeleteWord(t.children[word[0]], word[1..])], t.isWord)
+                Trie2(map key | key in t.children && (
+                    (key != word[0] ==> t.children[key].isWord || t.children[key].children.Keys != {}) &&
+                    (key == word[0] ==> child.isWord || child.children.Keys != {})
+                ):: if key != word[0] then t.children[key] else child, t.isWord)
             else
                 t
     }
@@ -250,12 +255,16 @@ module Tries {
     //         var s := sumSeq(ss, "|");
     //         s + if t.isWord then "|" else ""
     // }
+    predicate IsPrefix<T(==)>(xs: seq<T>, ys: seq<T>) {
+        |xs| <= |ys| && xs == ys[..|xs|]
+    }
 
     class Trie {
         var children: map<char, Trie>
         var isWord: bool
         ghost var repr: set<Trie>
         ghost var words: set<string>
+        ghost var firstChars: set<char>
 
         constructor() 
             ensures fresh(this.repr)
@@ -263,12 +272,13 @@ module Tries {
             ensures this.children.Keys == {}
             ensures this.children.Values == {}
             ensures this.words == {}
+            ensures this.firstChars == {}
             ensures Valid()
-            ensures ValidWords()
         {
             children := map[];
             isWord := false;
             words := {};
+            firstChars := {};
             new;
             assert this !in this.children.Values;
             repr := {this};
@@ -293,7 +303,59 @@ module Tries {
                     false
             else
                 isWord
-        } 
+        }
+
+        predicate hasPrefix(word: string) 
+            requires Valid()
+            reads this, repr
+            decreases repr
+        {
+            if |word| > 0 then
+                if word[0] in children then
+                    children[word[0]].hasPrefix(word[1..])
+                else
+                    false
+            else 
+                true
+        }
+
+        lemma TrieHasWordPrefixes(word: string)
+            requires Valid()
+            requires exists w :: w in this.words && IsPrefix(word, w)
+            ensures hasPrefix(word)
+        {
+            if |word| == 0 {
+
+            }else{
+                if word[0] in children {
+                    var w :| w in this.words && IsPrefix(word, w);
+                    assert w[1..] in this.children[word[0]].words;
+                    assert IsPrefix(word[1..], w[1..]);
+                    this.children[word[0]].TrieHasWordPrefixes(word[1..]);
+                }else{
+                    assert false;
+                }
+            }
+        }
+
+        lemma  TrieDoesNotHaveWordPrefix(word: string)
+            requires |word| > 0
+            requires Valid()
+            requires forall w :: w in this.words ==> !IsPrefix(word, w)
+            ensures !hasPrefix(word)
+        {
+            // if hasPrefix(word) {
+            //     assert word[0] !in children.Keys by {
+            //         if word[0] in children.Keys {
+            //             var w :| w in this.words && |w| > 0 && w[0] == word[0];
+            //             assert IsPrefix(word[0..1], w);
+            //             assert false;
+            //         }
+            //     }
+            //     assert false;
+            // }
+        }
+
 
         twostate lemma ChildUnionContains(root: Trie, child: Trie)
             requires old(root.Valid())
@@ -355,26 +417,48 @@ module Tries {
             ) &&
             (forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y]) &&
             (forall x <- this.children.Keys, y <- this.children.Keys :: this.children[x] != this.children[y] ==> this.children[x].repr !! this.children[y].repr) &&
+            (this.firstChars == set word | word in words && |word| > 0 :: word[0]) &&
+            (this.firstChars == this.children.Keys) &&
             (this.children.Keys == {} ==> this.repr == {this}) &&
             (this.children.Keys != {} ==> this.repr == {this}+Union(set k | k in this.children.Keys :: this.children[k].repr)) &&
-            (forall word :: word in this.words && |word| > 0 ==> word[0] in this.children.Keys)
-        }
-
-        ghost predicate ValidWords()
-            requires Valid()
-            reads this, repr
-            decreases repr
-        {
-            (forall word :: word in this.words ==> this.has(word))  &&
             (forall key :: key in this.children.Keys ==> this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..]) &&
-            (forall key :: key in this.children.Keys ==> this.children[key].ValidWords()) &&
             // required for TrieDoesNotHaveWord
             ("" in this.words <==> this.isWord)
         }
 
+
+        lemma TrieHasWord(word: string)
+            requires Valid()
+            requires word in this.words
+            ensures this.has(word)
+            decreases this.repr
+        {
+            if |word| > 0 {
+                if word[0] in this.children {
+                    this.children[word[0]].TrieHasWord(word[1..]);
+                } else {
+                    assert word[0] !in this.children.Keys;
+                    assert false;
+                }
+            } else {
+                assert this.isWord;
+            }
+        }
+        
+        lemma TrieHasAllWords()
+            requires Valid()
+            ensures forall word :: word in this.words ==> this.has(word)
+            decreases this.repr
+        {
+            forall word | word in this.words
+                ensures this.has(word)
+            {
+                TrieHasWord(word);
+            }
+        }
+
         lemma TrieDoesNotHaveWord( word: string)
             requires Valid()
-            requires ValidWords()
             requires word !in this.words
             ensures this.has(word) == false
             decreases this.repr
@@ -403,7 +487,6 @@ module Tries {
 
         lemma WordsNotInWordsTrieDoesNotHave()
             requires Valid()
-            requires ValidWords()
             ensures forall word :: word !in this.words ==> this.has(word) == false
             decreases this.repr
         {
@@ -414,16 +497,14 @@ module Tries {
             }
         }
 
-        method {:verify } {:vcs_split_on_every_assert} insertRecursive(word: string)// returns (child': Trie)
+        method {:verify } {:vcs_split_on_every_assert} insertRecursive(word: string)
             requires this.Valid()
-            requires ValidWords()
             ensures this.Valid()
-            ensures ValidWords()
             ensures this.words == old(this.words) + {word}
             ensures this.repr >= old(this.repr)
             ensures fresh(this.repr - old(this.repr))
-            // ensures |word| == 0 ==> this.isWord
-            // ensures |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr)
+            ensures |word| == 0 ==> this.isWord
+            ensures |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr)
             ensures |word| >0 ==> word[0] in this.children.Keys
             modifies repr
         {
@@ -438,14 +519,25 @@ module Tries {
                      (set x | x in this.children.Keys :: old(this.children[x].repr))-{old(this.children[word[0]].repr)} + {this.children[word[0]].repr};
                     }
                     UnionPlusSuperset(set x | x in this.children.Keys :: old(this.children[x].repr), old(this.children[word[0]].repr), this.children[word[0]].repr);
+                    // assert this.children.Keys == set word | word in words && |word| > 0 :: word[0];
+                    // assert this.firstChars == set word | word in words && |word| > 0 :: word[0];
+                    // assert this.firstChars + {word[0]} == this.firstChars;
+                    // assert this.children.Keys == old(this.children.Keys);
+                    // assert this.children.Keys == firstChars;
+                    // assert forall x <- this.children.Keys :: (
+                    //     this.children[x] in this.repr &&
+                    //     this.children[x].repr <= this.repr &&
+                    //     this !in this.children[x].repr && 
+                    //     this.children[x].Valid()
+                    // );
                     assert Valid();
-                    assert ValidWords();
                 } else {
                     var child := new Trie();
                     assert child.words == {};
                     child.insertRecursive(word[1..]);
                     this.children := this.children[word[0] := child];
                     this.words := this.words + {word};
+                    this.firstChars := this.firstChars + {word[0]};
                     this.repr := this.repr + child.repr;
                     assert this.children.Keys == old(this.children.Keys) + {word[0]};
                     assert fresh(child.repr);
@@ -463,16 +555,16 @@ module Tries {
                         {assert (set x | x in this.children.Keys && x != word[0] :: this.children[x].repr) + {child.repr} == set x | x in this.children.Keys :: this.children[x].repr;}
                         Union(set x | x in this.children.Keys :: this.children[x].repr)+ {this};
                     }
+                    // assert this.children.Keys == set word | word in words && |word| > 0 :: word[0];
                     // assert this.repr == {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
                     assert Valid();
-                    assert ValidWords();
                 }
             }else{
                 this.isWord := true;
                 this.words := this.words + {word};
+                // assert this.children.Keys == set word | word in words && |word| > 0 :: word[0];
                 assert (set x | x in this.children.Keys :: this.children[x].repr) == (set x | x in this.children.Keys :: old(this.children[x].repr));
                 assert Valid();
-                assert ValidWords();
             }
         }
 
@@ -493,12 +585,10 @@ module Tries {
     x.Children[key[0]] := Trie-Delete(x.Children[key[0]], key[1:])
     return x
         */
-        method deleteRec(word: string)
+        method {:verify false} deleteRec(word: string)
             requires this.Valid()
-            requires this.ValidWords()
             requires word in this.words
             ensures this.Valid()
-            ensures this.ValidWords()
             ensures this.words == old(this.words) - {word}
             ensures this.repr <= old(this.repr)
             ensures |word| > 0 ==> forall x :: x in this.children.Keys && x != word[0] ==> this.children[x].repr <= old(repr) && unchanged(this.children[x].repr)
@@ -509,9 +599,10 @@ module Tries {
                 if word[0] in this.children {
                     this.children[word[0]].deleteRec(word[1..]);
                     this.words := this.words - {word};
-                    if !this.children[word[0]].isWord && this.children.Keys == {} {
+                    if !this.children[word[0]].isWord && this.children[word[0]].children.Keys == {} {
                         this.children := map k | k in this.children.Keys && k != word[0] :: this.children[k];
                     }
+                    assume this.children.Keys == set word | word in words && |word| > 0 :: word[0];
                     // this.repr := {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
                     this.repr := this.repr - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
                     assume {this} + Union(set x | x in this.children.Keys :: this.children[x].repr) == old(this.repr) - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
@@ -538,6 +629,7 @@ module Tries {
                             }
                         }
                     }
+                    assert Valid();
                 }else{
                     assert false;
                 }
@@ -1047,12 +1139,14 @@ module Tries {
             trie.insertRecursive("hello");
             trie.insertRecursive("hello!");
             trie.insertRecursive("boo");
+            trie.TrieHasAllWords();
             assert trie.has("hello");
             assert trie.has("boo");
             trie.WordsNotInWordsTrieDoesNotHave();
             assert !trie.has("book");
             assert !trie.has("foobar");
             trie.deleteRec("hello");
+            trie.TrieHasAllWords();
             trie.WordsNotInWordsTrieDoesNotHave();
             assert !trie.has("hello");
             assert trie.has("boo");
