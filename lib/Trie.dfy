@@ -1,264 +1,9 @@
 
-
+include "./sets.dfy"
+include "./seq.dfy"
 module Tries {
-    datatype Trie2 = Trie2(children: map<char, Trie2>, isWord: bool)
-    ghost function Union<T>(s: set<set<T>>): set<T> 
-    {
-        if s == {} then 
-            assert forall x :: x in s ==> x <= {};
-            {} 
-        else
-            var x :| x in s;
-            assert forall x :: x in s ==> x <= x + Union(s - {x});
-            x + Union(s - {x})
-    }
-
-
-    lemma UnionPlusSuperset<T>(s: set<set<T>>, x: set<T>, y: set<T>)
-        requires x <= y
-        requires x in s
-        requires forall y :: y in s ==> y != {}
-        ensures Union(s)+y == Union(s-{x} + {y})
-        decreases s
-    {
-        if s == {} {
-
-        }else{
-            UnionPlusOne(s-{x}, x);
-            calc{
-                Union(s-{x}+{x});
-                Union(s-{x}) + x;
-                {assert s-{x}+{x} == s;} 
-                Union(s);
-            }
-            // calc {
-            //     Union(s-{x}+{y});
-            //     {UnionPlusOne(s-{x}, y);}
-            //     Union(s-{x}) + y;
-            //     Union(s-{x}) + y + x;
-            //     // Union(s-{x} + {y}) + y;
-            //     Union(s) + y;
-            // }
-            assert Union(s-{x}+{x}) == Union(s-{x}) + x;
-            assert Union(s) == Union(s-{x}) + x;
-            assert Union(s) + y == Union(s-{x}) + x + y;
-            assert Union(s-{x}) + y == Union(s-{x}) + x + y;
-            UnionPlusOneIdempotent(s-{x}, y);
-
-        }
-    }
-
-    lemma UnionPlusOneIdempotent<T>(s: set<set<T>>, x: set<T>)
-        requires x != {}
-        requires forall y :: y in s ==> y != {}
-        ensures Union(s + {x}) == Union(s) + x
-        decreases s
-    {
-        if s == {} {
-        } else if x !in s {
-            UnionPlusOne(s, x);
-        }else{
-            assert s+{x} == s;
-            assert Union(s+{x}) == Union(s);
-            UnionHasAll(s);
-        }
-    }
-    lemma UnionPlusOne<T>(s: set<set<T>>, x: set<T>)
-        requires x != {}
-        requires forall y :: y in s ==> y != {}
-        requires x !in s
-        ensures Union(s + {x}) == Union(s) + x
-        decreases s
-    {
-        if s == {} {
-            assert Union({x}) == x;
-            assert Union(s + {x}) == Union({x});
-            assert Union(s) == {};
-            assert Union(s) + x == x;
-        } else {
-            // var y :| y in s && Union(s) == y + Union(s - {y});
-            // // UnionPlusOne(s - {y}, y);
-            // // assert Union((s-{y})+{y}) == Union(s - {y}) + y;
-            // UnionPlusOne(s - {y}, x);
-            // assert Union(s - {y} + {x}) == Union(s - {y}) + x;
-            assert s+{x} != {};
-            var z :| z in s + {x} && Union(s+{x}) == z + Union((s+{x})- {z} );
-            if z == x {
-
-            }else {
-                assert Union(s+{x}) == z + Union(s+{x} - {z});
-                UnionPlusOne(s-{z}, x);
-                assert Union(s-{z}+{x}) == Union(s-{z}) + x;
-                assert s -{z} + {x} == s+{x}-{z};
-                UnionPlusOne(s-{z}, z);
-                // assert Union(s-{z}+{z}) == Union(s-{z}) + z;
-                assert s -{z} + {z} == s ;
-                assert Union(s) == Union(s-{z}) + z;
-                assert Union(s-{z}+{x}) == Union(s-{z}) + x;
-                // assert Union(s+{x}) == Union(s-{z}) + z;
-                calc {
-                    Union(s+{x});
-                    z + Union(s+ {x}-{z});
-                    Union(s+ {x}-{z})+z;
-                    Union(s-{z})+x+z;
-                    Union(s-{z})+z+x;
-                }
-
-            }
-            // assert Union(s + {x}) == Union(s - {y} + {x}) == Union(s - {y}) + x;
-            // assert Union(s + {x}) == Union(s + {x - {y}}) + y;
-            // assert Union(s + {x - {y}}) == Union(s) + x - {y};
-            // assert Union(s + {x}) == Union(s) + x;
-        }
-    }
-
-    lemma UnionContains<T>(s: set<set<T>>, x: T)
-        requires x in Union(s)
-        ensures exists y :: y in s && x in y
-    {
-    }
-    
-    lemma UnionHasAll<T>(s: set<set<T>>)
-        ensures forall x :: x in s ==> x <= Union(s)
-        ensures forall y :: y in s ==> forall x :: x in y ==> x in Union(s)
-    {
-        if s == {} {
-            assert forall x :: x in s ==> x <= Union(s);
-        } else {
-            var x :| x in s && Union(s) == x + Union(s - {x});
-            UnionHasAll(s - {x});
-            // assert forall x :: x in s-{x} ==> x <= Union(s-{x});
-            // assert x <= x + Union(s-{x});
-            forall y | y in s
-                ensures y <= x + Union(s-{x}) 
-            {
-                if y == x {
-                    assert y <= x;
-                } else {
-                    assert y in s-{x};
-                    assert y <= Union(s-{x});
-                    assert y <= x + Union(s-{x});
-                }
-            }
-            // assert Union(s) == x + Union(s-{x});
-            // assert forall x :: x in s ==> x <= Union(s);
-        }
-    }
-
-    predicate ValidTrie(t: Trie2) 
-    {
-        t !in t.children.Values &&
-        (forall x :: x in t.children.Values ==> ValidTrie(x))
-    }
-
-    ghost function ChildrenSet2(parent: Trie2): set<Trie2> 
-        decreases parent
-    {
-        Union(set x | x in parent.children.Values :: ChildrenSet2(x)) + {parent}
-    }
-
-    ghost function ChildrenSet(parent: Trie2, children: set<Trie2>, res: set<Trie2>): set<Trie2> 
-        requires children <= parent.children.Values
-        // requires ValidTrie(parent)
-        decreases parent, children
-    {
-        if children == {} then res else
-            var x :| x in children;
-            ChildrenSet(parent, children - {x}, res + ChildrenSet(x, x.children.Values, {x}))
-    }
-
-    ghost function TrieSet(parent: Trie2): set<Trie2> 
-        // requires ValidTrie(parent)
-        decreases parent
-    {
-        ChildrenSet(parent, parent.children.Values, {parent})
-    }
-
-
-    function InsertWord(t: Trie2, word: string): Trie2
-        decreases |word|
-    {
-        if |word| == 0 && t.isWord then
-            t
-        else if |word| == 0 && !t.isWord then
-            Trie2(t.children, true)
-        else
-            if word[0] in t.children then
-                Trie2(t.children[word[0] := InsertWord(t.children[word[0]], word[1..])], t.isWord)
-            else
-                Trie2(t.children[word[0] := InsertWord(Trie2(map[], false), word[1..])], t.isWord)
-    }
-
-    predicate HasWord(t: Trie2, word: string)
-        decreases |word|
-    {
-        if |word| == 0 then
-            t.isWord
-        else
-            if word[0] in t.children then
-                HasWord(t.children[word[0]], word[1..])
-            else
-                false
-    }
-
-    function DeleteWord(t: Trie2, word: string): Trie2
-        decreases |word|
-    {
-        if |word| == 0 then
-            Trie2(t.children, false)
-        else
-            if word[0] in t.children then
-                var child := DeleteWord(t.children[word[0]], word[1..]);
-                // Trie2(t.children[word[0] := DeleteWord(t.children[word[0]], word[1..])], t.isWord)
-                Trie2(map key | key in t.children && (
-                    (key != word[0] ==> t.children[key].isWord || t.children[key].children.Keys != {}) &&
-                    (key == word[0] ==> child.isWord || child.children.Keys != {})
-                ):: if key != word[0] then t.children[key] else child, t.isWord)
-            else
-                t
-    }
-
-    lemma ThereIsAMinimum(s: set<char>)
-        requires s != {}
-        ensures exists x :: x in s && forall y :: y in s ==> x <= y
-    {
-        assert s != {};
-        var x :| x in s;
-        if s == {x} {
-        } else {
-            var s' := s - {x};
-            assert s == s' + {x};
-            ThereIsAMinimum(s');
-        }
-    }
-
-    function SetToSequence(s: set<char>): seq<char>
-        ensures var q := SetToSequence(s); forall i :: 0 <= i < |q| ==> q[i] in s
-        ensures |SetToSequence(s)| == |s|
-        ensures forall p :: p in s ==> p in SetToSequence(s)
-    {
-    if s == {} then [] else
-        ThereIsAMinimum(s);
-        var x :| x in s && forall y :: y in s ==> x <= y;
-        [x] + SetToSequence(s - {x})
-    }
-
-    // function TrieToRegex(t: Trie2): string
-    // {
-    //     if t.children.Keys == {} then
-    //         ""
-    //     else
-    //         var children := SetToSequence(t.children.Keys);
-    //         assert forall c :: c in children ==> c in t.children.Keys;
-    //         var pairs := Map((c: char) requires c in t.children.Keys => (c, TrieToRegex(t.children[c])), children);
-    //         var ss := Map((p: (char, string)) => [p.0] + if p.1 != "" && Contains(p.1, "|") then "("+p.1+")" else p.1, pairs);
-    //         var s := sumSeq(ss, "|");
-    //         s + if t.isWord then "|" else ""
-    // }
-    predicate IsPrefix<T(==)>(xs: seq<T>, ys: seq<T>) {
-        |xs| <= |ys| && xs == ys[..|xs|]
-    }
-
+    import opened SetCustom
+    import opened SeqCustom
     class Trie {
         var children: map<char, Trie>
         var isWord: bool
@@ -343,18 +88,7 @@ module Tries {
             requires Valid()
             requires forall w :: w in this.words ==> !IsPrefix(word, w)
             ensures !hasPrefix(word)
-        {
-            // if hasPrefix(word) {
-            //     assert word[0] !in children.Keys by {
-            //         if word[0] in children.Keys {
-            //             var w :| w in this.words && |w| > 0 && w[0] == word[0];
-            //             assert IsPrefix(word[0..1], w);
-            //             assert false;
-            //         }
-            //     }
-            //     assert false;
-            // }
-        }
+        {}
 
 
         twostate lemma ChildUnionContains(root: Trie, child: Trie)
@@ -437,7 +171,7 @@ module Tries {
                 if word[0] in this.children {
                     this.children[word[0]].TrieHasWord(word[1..]);
                 } else {
-                    assert word[0] !in this.children.Keys;
+                    // assert word[0] !in this.children.Keys;
                     assert false;
                 }
             } else {
@@ -477,11 +211,11 @@ module Tries {
                     this.children[word[0]].TrieDoesNotHaveWord( word[1..]);
                 } else {
                     assert word[0] !in this.children.Keys;
-                    assert this.has(word) == false;
+                    // assert this.has(word) == false;
                 }
             } else {
                 assert this.isWord == false;
-                assert this.has(word) == false;
+                // assert this.has(word) == false;
             }
         }
 
@@ -500,7 +234,7 @@ module Tries {
         lemma ValidTrie() 
             requires Valid()
             ensures forall word :: word in this.words ==> this.has(word)
-            ensures forall word :: word !in this.words ==> this.has(word) == false
+            ensures forall word :: word !in this.words ==> !this.has(word)
         {
             TrieHasAllWords();
             WordsNotInWordsTrieDoesNotHave();
@@ -528,17 +262,6 @@ module Tries {
                      (set x | x in this.children.Keys :: old(this.children[x].repr))-{old(this.children[word[0]].repr)} + {this.children[word[0]].repr};
                     }
                     UnionPlusSuperset(set x | x in this.children.Keys :: old(this.children[x].repr), old(this.children[word[0]].repr), this.children[word[0]].repr);
-                    // assert this.children.Keys == set word | word in words && |word| > 0 :: word[0];
-                    // assert this.firstChars == set word | word in words && |word| > 0 :: word[0];
-                    // assert this.firstChars + {word[0]} == this.firstChars;
-                    // assert this.children.Keys == old(this.children.Keys);
-                    // assert this.children.Keys == firstChars;
-                    // assert forall x <- this.children.Keys :: (
-                    //     this.children[x] in this.repr &&
-                    //     this.children[x].repr <= this.repr &&
-                    //     this !in this.children[x].repr && 
-                    //     this.children[x].Valid()
-                    // );
                     assert Valid();
                 } else {
                     var child := new Trie();
@@ -661,16 +384,16 @@ module Tries {
                     ensures node.Valid()
                 {
                     if node == root {
-                        assert root.Valid();
+                        // assert root.Valid();
                     } else if node in root.children.Values {
-                        assert node.Valid();
+                        // assert node.Valid();
                     } else {
                         assert node !in root.children.Values;
                         // assert node in Union(set x | x in root.children.Values :: x.repr);
                         UnionContains(set x | x in root.children.Keys :: root.children[x].repr, node);
                         var k :| k in root.children.Keys && node in root.children[k].repr;
                         ValidImpliesAllValid(root.children[k]); 
-                        assert node.Valid();
+                        // assert node.Valid();
                     }
                 }
             }
@@ -1161,17 +884,6 @@ module Tries {
 
         }
 
-        method testTrie2() {
-            var t2 := Trie2(map[], false);
-            t2 := InsertWord(t2, "hello");
-            t2 := InsertWord(t2, "hello!");
-            t2 := InsertWord(t2, "boo");
-            assert HasWord(t2, "hello");
-            assert HasWord(t2, "boo");
-            t2 := DeleteWord(t2, "hello");
-            assert !HasWord(t2, "hello");
-            assert HasWord(t2, "boo");
-            assert HasWord(t2, "hello!");
-        }
+
     }
 }
