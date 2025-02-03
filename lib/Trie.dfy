@@ -496,6 +496,15 @@ module Tries {
                 TrieDoesNotHaveWord(word);
             }
         }
+        
+        lemma ValidTrie() 
+            requires Valid()
+            ensures forall word :: word in this.words ==> this.has(word)
+            ensures forall word :: word !in this.words ==> this.has(word) == false
+        {
+            TrieHasAllWords();
+            WordsNotInWordsTrieDoesNotHave();
+        }
 
         method {:verify } {:vcs_split_on_every_assert} insertRecursive(word: string)
             requires this.Valid()
@@ -585,7 +594,7 @@ module Tries {
     x.Children[key[0]] := Trie-Delete(x.Children[key[0]], key[1:])
     return x
         */
-        method {:verify false} deleteRec(word: string)
+        method {:verify } deleteRec(word: string)
             requires this.Valid()
             requires word in this.words
             ensures this.Valid()
@@ -602,7 +611,6 @@ module Tries {
                     if !this.children[word[0]].isWord && this.children[word[0]].children.Keys == {} {
                         this.children := map k | k in this.children.Keys && k != word[0] :: this.children[k];
                     }
-                    assume this.children.Keys == set word | word in words && |word| > 0 :: word[0];
                     // this.repr := {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
                     this.repr := this.repr - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
                     assume {this} + Union(set x | x in this.children.Keys :: this.children[x].repr) == old(this.repr) - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
@@ -1139,15 +1147,13 @@ module Tries {
             trie.insertRecursive("hello");
             trie.insertRecursive("hello!");
             trie.insertRecursive("boo");
-            trie.TrieHasAllWords();
+            trie.ValidTrie();
             assert trie.has("hello");
             assert trie.has("boo");
-            trie.WordsNotInWordsTrieDoesNotHave();
             assert !trie.has("book");
             assert !trie.has("foobar");
             trie.deleteRec("hello");
-            trie.TrieHasAllWords();
-            trie.WordsNotInWordsTrieDoesNotHave();
+            trie.ValidTrie();
             assert !trie.has("hello");
             assert trie.has("boo");
             assert trie.has("hello!");
