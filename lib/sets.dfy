@@ -113,13 +113,24 @@ module SetCustom {
     }
 
     lemma UnionMinusSome<T>(s: set<set<T>>, x: set<T>, x': set<T>)
+        requires x' != {}
         requires x' <= x
         requires x in s
         requires forall z,y :: z in s && y in s && z != y ==> z !! y
         requires forall y :: y in s ==> y != {}
         ensures Union(s-{x}+{x'}) == Union(s) -(x -x')
     {
-        assert s-{x}+{x'} == (s-{x})+{x'};
+        assert s-{x}+{x'} == s-{x}+{x'};
+        UnionMinusOne(s,x);
+        assert Union(s-{x}) == Union(s) - x;
+        UnionPlusOne(s-{x}, x');
+        assert Union(s-{x}+{x'}) == Union(s)-x + x';
+        UnionHasAll(s);
+        calc {
+            Union(s-{x}+{x'});
+            Union(s) - x + x';
+            Union(s) - (x - x');
+        }
     }
 
     lemma UnionContains<T>(s: set<set<T>>, x: T)
