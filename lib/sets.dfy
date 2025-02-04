@@ -79,6 +79,49 @@ module SetCustom {
         }
     }
 
+    lemma UnionDisjoint<T>(s: set<set<T>>, x: set<T>)
+        requires forall y :: y in s ==> x !! y
+        requires forall z,y :: z in s && y in s && z != y ==> z !! y
+        ensures Union(s) !! x
+    {
+        
+    }
+
+    lemma UnionMinusOne<T>(s: set<set<T>>, x: set<T>)
+        requires x in s
+        requires forall z,y :: z in s && y in s && z != y ==> z !! y
+        requires forall y :: y in s ==> y != {}
+        ensures Union(s - {x}) == Union(s) - x
+        decreases s
+    {
+        if s == {} {
+        } else {
+            var z :| z in s && Union(s) == z + Union(s - {z});
+            if x == z {
+                UnionDisjoint(s-{x}, x);
+                assert x + Union(s-{x})-x == Union(s-{x});
+            }else{
+                UnionDisjoint(s-{z}, z);
+                UnionMinusOne(s - {z}, x);
+                assert Union(s - {z}-{x}) == Union(s- {z}) - x; //
+                UnionPlusOne(s - {z}-{x}, z);
+                assert s - {z} - {x} + {z} == s - {x};
+                assert Union(s - {z}-{x} + {z}) == Union(s - {x}) + z;
+
+            }
+        }
+    }
+
+    lemma UnionMinusSome<T>(s: set<set<T>>, x: set<T>, x': set<T>)
+        requires x' <= x
+        requires x in s
+        requires forall z,y :: z in s && y in s && z != y ==> z !! y
+        requires forall y :: y in s ==> y != {}
+        ensures Union(s-{x}+{x'}) == Union(s) -(x -x')
+    {
+        assert s-{x}+{x'} == (s-{x})+{x'};
+    }
+
     lemma UnionContains<T>(s: set<set<T>>, x: T)
         requires x in Union(s)
         ensures exists y :: y in s && x in y

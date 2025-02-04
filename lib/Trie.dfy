@@ -130,9 +130,6 @@ module Tries {
                     Union(set x | x in old(root.children.Values) :: old(x.repr)) + old(root.children.Values) + child.repr;
                     old(root.ChildUnion()) + child.repr;
                 }
-                // assert child in root.ChildUnion();
-                // assert child in old(root.ChildUnion()) + {child};
-            // }
         }
 
         ghost predicate Valid() 
@@ -317,7 +314,69 @@ module Tries {
     x.Children[key[0]] := Trie-Delete(x.Children[key[0]], key[1:])
     return x
         */
-        method {:verify } deleteRec(word: string)
+        lemma noWordsValid(k: char)
+            requires (Valid())
+            requires k in this.children.Keys
+            requires this.children[k].children.Keys == {}
+            requires this.children[k].isWord == false
+            ensures this.children[k].words == {}
+            ensures (set w | w in words && |w| > 0 && w[0] == k) == {}
+        {
+            if w :| w in this.children[k].words {
+                if w == "" {
+                    assert false;
+                }else{
+                    assert |w| > 0;
+                    assert w[0] !in this.children[k].children.Keys;
+                    assert false;
+                }
+            }
+
+            if w :| w in words && |w| > 0 && w[0] == k {
+                assert w[1..] in this.children[k].words;
+                assert false;
+            }
+        }
+
+        twostate lemma noWords(k: char, word: string, child: Trie)
+            requires old(Valid())
+            requires k in old(this.children.Keys)
+            requires old(this.children[k]) == child
+            requires word in old(this.words) && |word| > 0 && word[0] == k
+            requires this.words == old(this.words) - {word}
+            requires old(child.Valid())
+            requires child.Valid()
+            requires child.words == old(child.words) - {word[1..]}
+            requires child.children.Keys == {}
+            requires child.isWord == false
+            ensures child.words == {}
+            ensures (set w | w in words && |w| > 0 && w[0] == k) == {}
+        {
+            if w :| w in child.words {
+                if w == "" {
+                    assert false;
+                }else{
+                    assert |w| > 0;
+                    assert w[0] !in child.children.Keys;
+                    assert false;
+                }
+            }
+
+            if w :| w in words && |w| > 0 && w[0] == k {
+                assert w[1..] in old(child.words);
+                if w[1..] == word[1..] {
+                    // assert w[1..] == word[1..];
+                    assert w == word;
+                    assert false;
+                }else{
+                assert w[1..] in child.words;
+                assert false;
+                }
+            }
+        }
+
+
+        method {:verify} {:vcs_split_on_every_assert} deleteRec(word: string)
             requires this.Valid()
             requires word in this.words
             ensures this.Valid()
@@ -332,11 +391,56 @@ module Tries {
                     this.children[word[0]].deleteRec(word[1..]);
                     this.words := this.words - {word};
                     if !this.children[word[0]].isWord && this.children[word[0]].children.Keys == {} {
+                        noWords(word[0], word, this.children[word[0]]);
                         this.children := map k | k in this.children.Keys && k != word[0] :: this.children[k];
+                        assert forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y];
+                        assert forall x :: x in this.children.Keys ==> this.children[x] == old(this.children[x]);
+                        this.repr := this.repr - old(this.children[word[0]].repr);
+                        this.firstChars := this.firstChars - {word[0]};
+                        assert (set w | w in words && |w| > 0 && w[0] == word[0]) == {};
+
+                        assert this.firstChars == set w | w in words && |w| > 0 :: w[0];
+                        if this.children.Keys == {} {
+                            if w :| w in this.words && |w| > 0 {
+                                assert w[0] in old(this.children.Keys);
+                                if w[0] == word[0] {
+                                    assert false;
+                                }else{
+                                    assert w[0] in this.children.Keys;
+                                    assert false;
+                                }
+                            }
+                            assert old(this.children.Keys) == {word[0]};
+                            assert this.words <= {""};
+                            assert this.children.Values == {};
+                            assert Union(set x | x in old(this.children.Keys) :: old(this.children[x].repr)) == old(this.children[word[0]].repr);
+                            // assert old(this.repr) == {this}+Union({old(this.children[word[0]].repr)});
+                            assert this.repr == {this};
+                        }else{
+                            UnionMinusOne(set x | x in old(this.children.Keys) :: old(this.children[x].repr), old(this.children[word[0]].repr));
+                            assert Union((set x | x in old(this.children.Keys) :: old(this.children[x].repr)) - {old(this.children[word[0]].repr)}) == Union(set x | x in old(this.children.Keys) :: old(this.children[x].repr))- old(this.children[word[0]].repr);
+                            assert (set x | x in old(this.children.Keys) :: old(this.children[x].repr)) - {old(this.children[word[0]].repr)} == (set x | x in this.children.Keys :: this.children[x].repr) by {
+                                assert forall x :: x in old(this.children.Keys) && x != word[0] ==> this.children[x].repr == old(this.children[x].repr);
+                            }
+                            assert Union(set x | x in this.children.Keys :: this.children[x].repr) == Union(set x | x in old(this.children.Keys) :: old(this.children[x].repr))- old(this.children[word[0]].repr);
+                            assert this.repr == {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
+                        }
+                    }else{
+                        this.repr := this.repr - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
+                        assert forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y];
+                        assert this.firstChars == set w | w in words && |w| > 0 :: w[0];
+                        assert forall x :: x in this.children.Keys ==> this.children[x] == old(this.children[x]);
+
+                        if this.children.Keys == {} {
+                            assert this.repr == {this};
+                        }else{
+                            assert (set x | x in this.children.Keys :: this.children[x].repr) == (set x | x in old(this.children.Keys) :: old(this.children[x].repr))- {old(this.children[word[0]].repr)}+ {this.children[word[0]].repr};
+                            UnionMinusSome(set x | x in old(this.children.Keys) :: old(this.children[x].repr), old(this.children[word[0]].repr), this.children[word[0]].repr);
+                            assert this.repr == {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
+                        }
                     }
                     // this.repr := {this} + Union(set x | x in this.children.Keys :: this.children[x].repr);
-                    this.repr := this.repr - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
-                    assume {this} + Union(set x | x in this.children.Keys :: this.children[x].repr) == old(this.repr) - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
+                    // assume {this} + Union(set x | x in this.children.Keys :: this.children[x].repr) == old(this.repr) - (old(this.children[word[0]].repr) - this.children[word[0]].repr);
                     assert forall key :: key in this.children.Keys ==> this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..] by {
                         forall key | key in this.children.Keys
                             ensures this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..]
@@ -358,6 +462,13 @@ module Tries {
                                 assert key in old(this.children.Keys);
                                 assert this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..];
                             }
+                        }
+                    }
+                    
+                    assert forall x <- this.children.Keys, y <- this.children.Keys :: x != y ==> this.children[x] != this.children[y] by {
+                        forall x | x in this.children.Keys
+                            ensures this.children[x] == old(this.children[x])
+                        {
                         }
                     }
                     assert Valid();
@@ -398,7 +509,8 @@ module Tries {
                 }
             }
         }
-        lemma {:verify } AllChildrenInRepr(root: Trie, child: Trie)
+
+        lemma AllChildrenInRepr(root: Trie, child: Trie)
             requires root.Valid()
             requires child in root.repr
             ensures child.repr <= root.repr
@@ -409,7 +521,6 @@ module Tries {
                     assert root in root.repr;
                     var x :| x in root.repr ;
                     if x != root {
-                        // var k :| k in root.children.Keys && root.children[k] == x;
                         assert x !in root.repr;
                         assert false;
                     }
@@ -424,9 +535,6 @@ module Tries {
                 } else {
                     UnionContains(set x | x in root.children.Keys :: root.children[x].repr, child);
                     var k :| k in root.children.Keys && child in root.children[k].repr;
-                    // assert child in Union(set x | x in root.children.Values :: x.repr);
-                    // UnionContains(set x | x in root.children.Values :: x.repr, child);
-                    // var x :| x in root.children.Values && child in x.repr;
                 }
             }
         }
