@@ -4,6 +4,7 @@ include "./seq.dfy"
 module Tries {
     import opened SetCustom
     import opened SeqCustom
+    export reveals *
     class Trie {
         var children: map<char, Trie>
         var isWord: bool
@@ -35,6 +36,12 @@ module Tries {
         // {
         //     Union(set x | x in children.Values :: x.repr)+ this.children.Values
         // }
+        ghost function ReprSet(): set<set<Trie>>
+            reads this`children, this.children.Values
+            decreases repr
+        {
+            set k | k in this.children.Keys :: this.children[k].repr
+        }
 
         predicate has(word: string)
             requires Valid()
@@ -140,6 +147,7 @@ module Tries {
             this in this.repr &&
             (
                 forall x <- this.children.Keys :: (
+                    this != this.children[x] &&
                     this.children[x] in this.repr &&
                     this.children[x].repr <= this.repr &&
                     this !in this.children[x].repr && 
@@ -151,7 +159,7 @@ module Tries {
             (this.firstChars == set word | word in words && |word| > 0 :: word[0]) &&
             (this.firstChars == this.children.Keys) &&
             (this.children.Keys == {} ==> this.repr == {this}) &&
-            (this.children.Keys != {} ==> this.repr == {this}+Union(set k | k in this.children.Keys :: this.children[k].repr)) &&
+            (this.children.Keys != {} ==> this.repr == {this}+Union(this.ReprSet())) &&
             (forall key :: key in this.children.Keys ==> this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..]) &&
             // required for TrieDoesNotHaveWord
             ("" in this.words <==> this.isWord)
