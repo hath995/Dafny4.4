@@ -147,7 +147,6 @@ module Tries {
             this in this.repr &&
             (
                 forall x <- this.children.Keys :: (
-                    this != this.children[x] &&
                     this.children[x] in this.repr &&
                     this.children[x].repr <= this.repr &&
                     this !in this.children[x].repr && 
