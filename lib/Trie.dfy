@@ -158,7 +158,7 @@ module Tries {
             (this.firstChars == set word | word in words && |word| > 0 :: word[0]) &&
             (this.firstChars == this.children.Keys) &&
             (this.children.Keys == {} ==> this.repr == {this}) &&
-            (this.children.Keys != {} ==> this.repr == {this}+Union(this.ReprSet())) &&
+            (this.children.Keys != {} ==> this.repr == {this}+Union(set k | k in this.children.Keys :: this.children[k].repr)) &&
             (forall key :: key in this.children.Keys ==> this.children[key].words == set ws | ws in this.words && |ws| > 0 && ws[0] == key :: ws[1..]) &&
             // required for TrieDoesNotHaveWord
             ("" in this.words <==> this.isWord)
