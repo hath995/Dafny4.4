@@ -142,6 +142,7 @@ module SetCustom {
     lemma UnionHasAll<T>(s: set<set<T>>)
         ensures forall x :: x in s ==> x <= Union(s)
         ensures forall y :: y in s ==> forall x :: x in y ==> x in Union(s)
+        ensures forall x :: x in Union(s) ==> exists y :: y in s && x in y
     {
         if s == {} {
         } else {
@@ -157,6 +158,12 @@ module SetCustom {
                 }
             }
         }
+    }
+
+    lemma NotInAllNotInUnion<T>(s: set<set<T>>, x: T)
+        requires forall y :: y in s ==> x !in y
+        ensures x !in Union(s)
+    {
     }
 
 }

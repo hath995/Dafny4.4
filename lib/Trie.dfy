@@ -4,6 +4,7 @@ include "./seq.dfy"
 module Tries {
     import opened SetCustom
     import opened SeqCustom
+    export reveals *
     class Trie {
         var children: map<char, Trie>
         var isWord: bool
@@ -35,6 +36,12 @@ module Tries {
         // {
         //     Union(set x | x in children.Values :: x.repr)+ this.children.Values
         // }
+        ghost function ReprSet(): set<set<Trie>>
+            reads this`children, this.children.Values
+            decreases repr
+        {
+            set k | k in this.children.Keys :: this.children[k].repr
+        }
 
         predicate has(word: string)
             requires Valid()
