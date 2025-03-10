@@ -283,11 +283,24 @@ module Petersons2 {
 
     lemma WaitContinuity(trace: Trace, schedule: Schedule, p: Process, n: nat, u: nat)
         requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).cs[other(p)] == Wait
         requires trace(n).cs[p] == Wait
+        requires trace(n).turn == p
         requires u > n
         requires forall i :: n <= i < u ==> schedule(i) != p
-        ensures trace(n).cs[p] == Wait
+        ensures trace(u).cs[p] == Wait
+        ensures trace(u).turn == p
     {
+        var n' := n;
+        while n' < u
+            invariant n <= n' <= u
+            invariant forall i :: n <= i < n' ==> schedule(i) != p
+            invariant trace(n').cs[p] == Wait
+            invariant trace(n').turn == p
+            decreases u - n'
+        {
+            n' := n' + 1;
+        }
     }
 
     lemma WaitContinuity2(trace: Trace, schedule: Schedule, p: Process, n: nat, u: nat)
@@ -313,23 +326,135 @@ module Petersons2 {
     }
 
     // https://imgur.com/gallery/well-were-waiting-intergalactic-quality-upgrade-q48zWbR
-    lemma {:isolate_assertion} BothWaiting(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+    lemma BothWaiting(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
         requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
         requires trace(n).cs[p] == Wait
         requires trace(n).cs[other(p)] == Wait
         requires trace(n).turn == p
         ensures n <= n' 
-        ensures forall i :: n <= i < n' ==> schedule(i) != p
         ensures trace(n').turn == p
         ensures trace(n').cs[p] == Wait
+        ensures schedule(n') == p
     {
         var u := getNextStep(trace, schedule, p, n);
         n' := n;
-        while n' < u
+        while schedule(n') != p
             invariant n <= n' <= u
             invariant forall i :: n < i < n' ==> schedule(i) != p
+            invariant trace(n').turn == p
             invariant trace(n').cs[other(p)] == Wait
             invariant trace(n').cs[p] == Wait
+            decreases u - n'
+        {
+            n' := n' + 1;
+        }
+    }
+
+    /*
+        if the schedule schedules p while other(p) is in exit, or start , then p will enter critical section because flags[other(p)] is false
+        however, if other(p) is in gate then p will wait, until other(p) is in wait because gate will return turn to p
+    */
+    lemma pWaitingOtherExit(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).cs[p] == Wait
+        requires trace(n).cs[other(p)] == Exit
+        requires trace(n).turn == other(p)
+        ensures n <= n' 
+        ensures trace(n').cs[p] == Critical
+    {
+        var u := getNextStep(trace, schedule, p, n);
+        n' := n;
+        while schedule(n') != p
+            invariant n <= n' <= u
+            invariant forall i :: n < i < n' ==> schedule(i) != p
+            // invariant trace(n').turn == p
+            // invariant trace(n').cs[other(p)] == Exit
+            invariant (trace(n').cs[other(p)] == Exit || trace(n').cs[other(p)] == Start || trace(n').cs[other(p)] == Gate) ==> trace(n').turn == other(p)
+            invariant trace(n').cs[other(p)] == Wait ==> trace(n').turn == p
+            invariant trace(n').cs[p] == Wait
+            invariant trace(n').cs[other(p)] in {Exit, Start, Gate, Wait}
+            decreases u - n'
+        {
+            if trace(n').cs[other(p)] == Exit {
+                assert trace(n'+1).cs[other(p)] == Start;
+            }else if trace(n').cs[other(p)] == Start {
+                assert trace(n'+1).cs[other(p)] == Gate;
+            }else if trace(n').cs[other(p)] == Gate {
+                assert trace(n'+1).cs[other(p)] == Wait;
+            }else if trace(n').cs[other(p)] == Wait {
+                    assert trace(n'+1).cs[other(p)] == Wait;
+                    assert trace(n'+1).turn == p;
+            }else{
+                assert false;
+            }
+            n' := n' + 1;
+        }
+        assert schedule(n') == p;
+        if trace(n').cs[other(p)] == Exit || trace(n').cs[other(p)] == Start {
+            assert !trace(n').flags[other(p)];
+            assert trace(n'+1).cs[p] == Critical;
+            n' := n' + 1;
+        } else if trace(n').cs[other(p)] == Wait {
+            assert trace(n'+1).cs[p] == Critical;
+            n' := n' + 1;
+        }else if trace(n').cs[other(p)] == Gate {
+            //assert trace(n'+1).cs[other(p)] == Wait;
+            var u' := getNextStep(trace, schedule, other(p), n');
+            WaitContinuity2(trace, schedule, p, n', u');
+            assert trace(u').cs[other(p)] == Gate;
+            assert trace(u').cs[p] == Wait;
+            assert trace(u'+1).cs[other(p)] == Wait;
+            n' := BothWaiting(trace, schedule, p, u'+1);
+            return n'+1;
+        }else{
+            assert false;
+        }
+
+    }
+
+    lemma pWaitingOtherCritical(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).cs[p] == Wait
+        requires trace(n).cs[other(p)] == Critical
+        requires trace(n).turn == other(p)
+        ensures n <= n' 
+        ensures trace(n').cs[p] == Critical
+    {
+        var u := getNextStep(trace, schedule, other(p), n);
+        n' := n;
+        while schedule(n') != other(p)
+            invariant n <= n' <= u
+            invariant forall i :: n < i < n' ==> schedule(i) != other(p)
+            invariant trace(n').turn == other(p)
+            // invariant trace(n').cs[other(p)] == Exit
+            invariant trace(n').cs[p] == Wait
+            decreases u - n'
+        {
+            n' := n' + 1;
+        }
+        assert trace(n'+1).cs[other(p)] == Exit;
+        n' := pWaitingOtherExit(trace, schedule, p, n'+1);
+    }
+
+    lemma CriticalContinuity(trace: Trace, schedule: Schedule, p: Process, n: nat, u: nat) 
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).turn == other(p)
+        requires trace(n).flags[other(p)]
+        requires trace(n).cs[p] == Wait
+        requires trace(n).cs[other(p)] == Critical
+        requires forall i :: n <= i < u ==> schedule(i) == p
+        requires schedule(u) == other(p)
+        requires u >= n
+        requires schedule(u) == other(p)
+        ensures trace(u).turn == other(p)
+    {
+        var n' := n;
+        while schedule(n') != other(p)
+            invariant n <= n' <= u
+            invariant forall i :: n <= i < u ==> schedule(i) == p
+            invariant trace(n').cs[p] == Wait
+            invariant trace(n').cs[other(p)] == Critical
+            invariant trace(n').turn == other(p)
             decreases u - n'
         {
             n' := n' + 1;
@@ -359,11 +484,25 @@ module Petersons2 {
                 WaitContinuity2(trace, schedule, p, n, u);
                 assert trace(u+1).cs[p] == Wait;
                 assert trace(u+1).turn == p;
-                var u' := getNextStep(trace, schedule, p, u);
-                n' := LivenessOnTurn(trace, schedule, p, u');
-                return n';
+                //var u' := getNextStep(trace, schedule, p, u);
+                n' := BothWaiting(trace, schedule, p, u+1);
+                return n'+1;
             }else if trace(u).cs[other(p)] == Wait {
+                var u := getNextStep(trace, schedule, other(p), n);
+                WaitContinuity(trace, schedule, other(p), n, u);
+                WaitContinuity2(trace, schedule, p, n, u);
+                assert trace(u).cs[other(p)] == Wait;
+                assert trace(u+1).cs[other(p)] == Critical;
+                n' := pWaitingOtherCritical(trace, schedule, p, u+1);
+                return n';
             }else if trace(u).cs[other(p)] == Critical {
+                var u := getNextStep(trace, schedule, other(p), n);
+                WaitContinuity2(trace, schedule, p, n, u);
+                CriticalContinuity(trace, schedule, p, n, u);
+                assert trace(u).cs[other(p)] == Critical;
+                assert trace(u+1).cs[other(p)] == Exit;
+                n' := pWaitingOtherExit(trace, schedule, p, u+1);
+                return n';
             }else{
                 assert false;
             }
