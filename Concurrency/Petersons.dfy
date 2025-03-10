@@ -79,6 +79,7 @@ module Petersons2 {
         && s'.cs == s.cs[p := Critical]
         && s'.flags == s.flags
         && s'.turn == s.turn
+        && (s.turn == p || !s.flags[other(p)])
     }
 
     predicate WaitToWait(s: TSState, p: Process, s': TSState)
@@ -259,7 +260,116 @@ module Petersons2 {
         return n+1;
     }
 
-    lemma {:isolate_assertions} Liveness(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+    lemma getNextStep(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        // requires schedule(n) != p
+        // requires trace(n).turn == other(p)
+        ensures n <= n' && trace(n').cs[p] == trace(n).cs[p]
+        ensures forall i :: n < i < n' ==> schedule(i) != p
+        ensures schedule(n') == p
+    {
+        n' := n;
+        assert HasNext(schedule, p, n);
+        var u :| n <= u && schedule(u) == p;
+        while schedule(n') != p
+            invariant n' <= u
+            invariant trace(n').cs[p] == trace(n).cs[p]
+            invariant forall i :: n <= i < n' ==> schedule(i) != p
+            decreases u - n'
+        {
+            n' := n' + 1;
+        }
+    }
+
+    lemma WaitContinuity(trace: Trace, schedule: Schedule, p: Process, n: nat, u: nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).cs[p] == Wait
+        requires u > n
+        requires forall i :: n <= i < u ==> schedule(i) != p
+        ensures trace(n).cs[p] == Wait
+    {
+    }
+
+    lemma WaitContinuity2(trace: Trace, schedule: Schedule, p: Process, n: nat, u: nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).flags[other(p)]
+        requires trace(n).turn == other(p)
+        requires trace(n).cs[p] == Wait
+        requires u > n
+        requires forall i :: n <= i < u ==> schedule(i) == p
+        ensures trace(u).cs[p] == Wait
+    {
+        var n' := n;
+        while n' < u
+            invariant n <= n' <= u
+            invariant forall i :: n <= i < n' ==> schedule(i) == p
+            invariant trace(n').flags[other(p)]
+            invariant trace(n').turn == other(p)
+            invariant trace(n').cs[p] == Wait
+            decreases u - n'
+        {
+            n' := n' + 1;
+        }
+    }
+
+    // https://imgur.com/gallery/well-were-waiting-intergalactic-quality-upgrade-q48zWbR
+    lemma {:isolate_assertion} BothWaiting(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires trace(n).cs[p] == Wait
+        requires trace(n).cs[other(p)] == Wait
+        requires trace(n).turn == p
+        ensures n <= n' 
+        ensures forall i :: n <= i < n' ==> schedule(i) != p
+        ensures trace(n').turn == p
+        ensures trace(n').cs[p] == Wait
+    {
+        var u := getNextStep(trace, schedule, p, n);
+        n' := n;
+        while n' < u
+            invariant n <= n' <= u
+            invariant forall i :: n < i < n' ==> schedule(i) != p
+            invariant trace(n').cs[other(p)] == Wait
+            invariant trace(n').cs[p] == Wait
+            decreases u - n'
+        {
+            n' := n' + 1;
+        }
+    }
+
+    lemma LivenessOnSchedule(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
+        requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
+        requires schedule(n) == p
+        requires trace(n).turn == other(p)
+        requires trace(n).flags[other(p)]
+        requires trace(n).cs[p] == Wait
+        ensures n <= n' && trace(n').cs[p] == Critical
+    {
+            WaitImplies(trace, schedule, p, n);
+            AfterInit(trace, schedule, p, n);
+            if trace(n).cs[other(p)] == Start || trace(n).cs[other(p)] == Exit {
+                assert false;
+            }
+            assert trace(n).turn == other(p);
+            assert trace(n).flags[other(p)];
+
+            var u := getNextStep(trace, schedule, other(p), n);
+            assert schedule(u) == other(p);
+            if trace(u).cs[other(p)] == Gate {
+                assert trace(u+1).cs[other(p)] == Wait;
+                WaitContinuity2(trace, schedule, p, n, u);
+                assert trace(u+1).cs[p] == Wait;
+                assert trace(u+1).turn == p;
+                var u' := getNextStep(trace, schedule, p, u);
+                n' := LivenessOnTurn(trace, schedule, p, u');
+                return n';
+            }else if trace(u).cs[other(p)] == Wait {
+            }else if trace(u).cs[other(p)] == Critical {
+            }else{
+                assert false;
+            }
+    }
+
+    lemma Liveness(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
         requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in {0, 1}
         // requires schedule(n) == p
         requires trace(n).cs[p] == Wait
@@ -275,34 +385,24 @@ module Petersons2 {
         }else if schedule(n) == p {
             WaitImplies(trace, schedule, p, n);
             AfterInit(trace, schedule, p, n);
-            // assert trace(n).turn != -1;
-            // assert exists n_ :: n_ < n && trace(n_).cs[p] == Gate;
-            if trace(n).cs[other(p)] == Start || trace(n).cs[other(p)] == Exit {
-                assert false;
-            }
-            assert trace(n).turn == other(p);
-            assert trace(n).flags[other(p)];
-
-
-            var u :| n <= u && trace(u).cs[p] == Wait;
-            while trace(n').cs[p] != Critical
-                invariant n' <= u
-                invariant (forall i :: n <= i < n' ==> trace(i).cs[p] == Wait)
-            {
-                n' := n' + 1;
-            }
+            n' := LivenessOnSchedule(trace, schedule, p, n);
+            return n';
         } else {
-            WaitImplies(trace, schedule, p, n);
-            // AfterInit(trace, schedule, p, n);
-            assert schedule(n) == other(p);
-            // if trace(n).cs[other(p)] == Start || trace(n).cs[other(p)] == Exit {
-            //     assert false;
-            // }
-            // assert trace(n).turn == other(p);
-            // assert trace(n).flags[other(p)];
-            if trace(n).cs[other(p)] == Gate && schedule(n+1) == p {
-                n' := LivenessOnTurn(trace, schedule, p, n+1);
+            var u := getNextStep(trace, schedule, p, n);
+            if trace(u).turn == other(p) && trace(u).flags[other(p)] {
+                n' := LivenessOnSchedule(trace, schedule, p, u);
                 return n';
+            }else if trace(u).turn == p {
+                n' := LivenessOnTurn(trace, schedule, p, u);
+                return n';
+            }else if trace(u).turn == other(p) && !trace(u).flags[other(p)] {
+                n' := LivenessOnOther(trace, schedule, p, u);
+                return n';
+            }else{
+                WaitImplies(trace, schedule, p, u);
+                AfterInit(trace, schedule, p, u);
+                assert trace(u).turn == -1;
+                assert false;
             }
         }
     }

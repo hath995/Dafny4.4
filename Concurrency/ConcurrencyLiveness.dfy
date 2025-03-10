@@ -157,11 +157,17 @@ module ConcurrencyLiveness {
 
     lemma GetNextStep(trace: Trace, schedule: Schedule, p: Process, n: nat) returns (n': nat)
         requires FairSchedule(schedule) && IsTrace(trace, schedule) && p in P
+        //p is not thinking and is currently being served
+        //could be hungry or eating
         requires trace(n).cs[p] != Thinking && trace(n).t[p] == trace(n).serving
+        //we find a where p is scheduled
         ensures n <= n' && schedule(n') == p
+        //p remains the same
+        //because even if they are hungry, they are not scheduled and so they remain hungry
         ensures trace(n').serving == trace(n).serving
         ensures trace(n').cs[p] == trace(n).cs[p]
         ensures trace(n').t[p] == trace(n).t[p]
+        //all currently hungry philosophers remain hungry
         ensures (forall q ::
             q in P && trace(n).cs[q] == Hungry
             ==> trace(n').cs[q] == Hungry && trace(n').t[q] == trace(n).t[q])
