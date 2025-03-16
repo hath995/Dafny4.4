@@ -282,6 +282,14 @@ module CountBadPairs {
     {
     }
 
+    lemma GoodPairAltAlt(nums: seq<int>, i: nat, k: nat)
+        requires i < |nums|
+        requires i < k < |nums|
+        requires nums[k] - k == nums[i] - i
+        ensures nums[k] - nums[i] == k - i
+    {
+    }
+
     function DiffsSet(nums: seq<int>): set<int>
     {
         set x | 0 <= x < |nums| :: nums[x] - x
@@ -295,6 +303,7 @@ module CountBadPairs {
 
     ghost function IndicesCosets(nums: seq<int>, diff: set<int>): set<set<nat>>
         ensures forall x :: x in diff ==> IndicesCoset(nums, x) in IndicesCosets(nums, diff)
+        ensures forall x :: x in IndicesCosets(nums, diff) ==> exists y :: y in diff && x == IndicesCoset(nums, y)
     {
         if diff == {} then
             {}
@@ -309,8 +318,38 @@ module CountBadPairs {
         set x, y | x in coset && y in coset && x < y :: (x,y)
     }
 
+    function CosetToPairInPlusOne(coset: set<nat>, nums: seq<int>, i: int): set<(nat, nat)>
+        requires forall x :: x in coset ==> 0 <= x < i < |nums|
+        ensures forall p :: p in CosetToPairInPlusOne(coset, nums, i) ==> p.0 < p.1
+    {
+        set x | x in coset :: (x, i)
+    }
+
+    lemma CosetToPairPlusOne(coset: set<nat>, nums: seq<int>, i: int)
+        requires forall x :: x in coset ==> 0 <= x < i < |nums|
+        ensures |CosetToPairInPlusOne(coset, nums, i)| == |coset|
+    {
+        if coset == {} {
+            assert |CosetToPairInPlusOne(coset, nums, i)| == 0;
+        }else{
+            var x :| x in coset;
+            CosetToPairPlusOne(coset - {x}, nums, i);
+            assert (x, i) !in CosetToPairInPlusOne(coset-{x}, nums, i);
+            assert CosetToPairInPlusOne(coset, nums, i) == CosetToPairInPlusOne(coset-{x}, nums, i) + {(x, i)};
+        }
+    }
+
+    lemma CosetToPairInSeq(coset: set<nat>, nums: seq<int>)
+        requires forall i :: i in coset ==> 0 <= i < |nums|
+        ensures forall p :: p in CosetToPairs(coset) ==> p.0 < p.1
+        ensures forall p :: p in CosetToPairs(coset) ==> 0 <= p.0 < |nums|
+        ensures forall p :: p in CosetToPairs(coset) ==> 0 <= p.1 < |nums|
+    {
+    }
+
     ghost function AllCosetPairs(cosets: set<set<nat>>): set<(nat, nat)>
         ensures forall x :: x in cosets ==> CosetToPairs(x) <= AllCosetPairs(cosets)
+        ensures forall p :: p in AllCosetPairs(cosets) ==> exists x :: x in cosets && p in CosetToPairs(x)
     {
         if cosets == {} then
             {}
@@ -319,17 +358,29 @@ module CountBadPairs {
             CosetToPairs(x) + AllCosetPairs(cosets - {x})
     }
 
+    lemma AllCosetPairsPlusOne(cosets: set<set<nat>>, coset: set<nat>)
+        requires coset !in cosets
+        ensures AllCosetPairs(cosets + {coset}) == AllCosetPairs(cosets) + CosetToPairs(coset)
+    {
+    }
+
+    lemma  AllCosetsPairsInNums(nums: seq<int>)
+        requires |nums| > 0
+        ensures forall p :: p in AllCosetPairs(IndicesCosets(nums, DiffsSet(nums))) ==> 0 <= p.0 < |nums| && 0 <= p.1 < |nums|
+    {
+      forall p | p in AllCosetPairs(IndicesCosets(nums, DiffsSet(nums)))
+        ensures 0 <= p.0 < |nums| && 0 <= p.1 < |nums|
+      {
+        var cosets := IndicesCosets(nums, DiffsSet(nums));
+        var coset :| coset in cosets && p in CosetToPairs(coset);
+        CosetToPairInSeq(coset, nums);
+      }
+    }
+
     lemma AllCosetsEqualAllGoodPairs(nums: seq<int>)
         requires |nums| > 0
         ensures AllCosetPairs(IndicesCosets(nums, DiffsSet(nums))) == GoodPairs(nums)
     {
-        // forall x | x in IndicesCosets(nums, DiffsSet(nums))
-        //     ensures CosetToPairs(x) <= GoodPairs(nums)
-        // {
-        //     var i :| i in x;
-        //     var j :| j in x;
-        //     GoodPairAlt(nums, i, j);
-        // }
 
         forall p | p in GoodPairs(nums)
             ensures p in AllCosetPairs(IndicesCosets(nums, DiffsSet(nums)))
@@ -340,6 +391,8 @@ module CountBadPairs {
             var diff := nums[i] - i;
             assert diff in DiffsSet(nums);
             var coset := IndicesCoset(nums, diff);
+            assert i in coset;
+            assert j in coset;
             assert coset in IndicesCosets(nums, DiffsSet(nums));
             assert p in CosetToPairs(coset);
             assert p in AllCosetPairs(IndicesCosets(nums, DiffsSet(nums)));
@@ -348,29 +401,80 @@ module CountBadPairs {
         forall p | p in AllCosetPairs(IndicesCosets(nums, DiffsSet(nums)))
             ensures p in GoodPairs(nums)
         {
-            var diff := nums[p.0] - p.0;
-            assert diff in DiffsSet(nums);
+            AllCosetsPairsInNums(nums);
+            GoodPairAltAlt(nums, p.0, p.1);
+            var coset :| coset in IndicesCosets(nums, DiffsSet(nums)) && p in CosetToPairs(coset);
+            var diffy :| diffy in DiffsSet(nums) && coset == IndicesCoset(nums, diffy);
         }
     }
 
-    function DiffSetPairs(nums: seq<int>): set<(nat, nat)>
+    lemma IndicesCosetsContinuedNeg(nums: seq<int>, i: nat, diffCosets: map<int, set<nat>>, diffMap: map<int, nat>, diff: int)
+        requires i < |nums|
+        requires diff == nums[i] - i
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diff in diffMap
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diffMap[diff] == |IndicesCoset(nums[..i], diff)|
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diff in diffCosets
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diffCosets[diff] == IndicesCoset(nums[..i], diff)
+        requires diff !in diffMap
+        
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> ldiff in diffCosets[diff := {i}]
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> diffCosets[diff := {i}][ldiff] == IndicesCoset(nums[..i+1], ldiff)
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> ldiff in diffMap[diff := 1]
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> diffMap[diff := 1][ldiff] == |IndicesCoset(nums[..i+1], ldiff)|
     {
-        set x, y | 0 <= x < |nums| && x < y < |nums| && (nums[y] - y in DiffsSet(nums)) :: (x,y)
     }
 
-    function DiffSetPartial(nums: seq<int>, i: nat, k: nat): set<(nat, nat)>
+    lemma  IndicesCosetsContinuedPos(nums: seq<int>, i: nat, diffCosets: map<int, set<nat>>, diffMap: map<int, nat>, diff: int)
         requires i < |nums|
-        requires i < k < |nums|
+        requires diff == nums[i] - i
+        requires diff in DiffsSet(nums[..i])
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diff in diffMap
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diffMap[diff] == |IndicesCoset(nums[..i], diff)|
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diff in diffCosets
+        requires forall diff :: diff in DiffsSet(nums[..i]) ==> diffCosets[diff] == IndicesCoset(nums[..i], diff)
+        requires diff in diffMap
+        requires diff in diffCosets
+        
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> ldiff in diffCosets[diff := diffCosets[diff]+{i}]
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> diffCosets[diff := diffCosets[diff]+{i}][ldiff] == IndicesCoset(nums[..i+1], ldiff)
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> ldiff in diffMap[diff := diffMap[diff]+1]
+        ensures forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> diffMap[diff := diffMap[diff]+1][ldiff] == |IndicesCoset(nums[..i+1], ldiff)|
     {
-        set x | i < x < k && nums[x] - x == nums[i] - i :: (i,x)
+        assert IndicesCoset(nums[..i+1], diff) == IndicesCoset(nums[..i], diff) + {i};
+        assert forall ldiff :: ldiff in DiffsSet(nums[..i+1]) ==> diffCosets[diff := diffCosets[diff]+{i}][ldiff] == IndicesCoset(nums[..i+1], ldiff) by {
+            forall ldiff | ldiff in DiffsSet(nums[..i+1])
+                ensures diffCosets[diff := diffCosets[diff]+{i}][ldiff] == IndicesCoset(nums[..i+1], ldiff)
+            {
+                if ldiff == diff {
+                    assert diff in DiffsSet(nums[..i]);
+                    assert diffCosets[diff] == IndicesCoset(nums[..i], diff);
+                    assert diffCosets[diff]+{i} == IndicesCoset(nums[..i], diff) + {i};
+                    assert diffCosets[diff := diffCosets[diff]+{i}][ldiff] == IndicesCoset(nums[..i+1], ldiff);
+                }else{
+                    assert diffCosets[diff := diffCosets[diff]+{i}][ldiff] == IndicesCoset(nums[..i+1], ldiff);
+                }
+            }
+        }
     }
 
-    function DiffIndexSetPartial(nums: seq<int>, i: nat, k: nat): set<nat>
-        requires i < |nums|
-        requires i < k < |nums|
-    {
-        set x | i <= x < k && nums[x] - x == nums[i] - i :: x
-    }
+    // function DiffSetPairs(nums: seq<int>): set<(nat, nat)>
+    // {
+    //     set x, y | 0 <= x < |nums| && x < y < |nums| && (nums[y] - y in DiffsSet(nums)) :: (x,y)
+    // }
+
+    // function DiffSetPartial(nums: seq<int>, i: nat, k: nat): set<(nat, nat)>
+    //     requires i < |nums|
+    //     requires i < k < |nums|
+    // {
+    //     set x | i < x < k && nums[x] - x == nums[i] - i :: (i,x)
+    // }
+
+    // function DiffIndexSetPartial(nums: seq<int>, i: nat, k: nat): set<nat>
+    //     requires i < |nums|
+    //     requires i < k < |nums|
+    // {
+    //     set x | i <= x < k && nums[x] - x == nums[i] - i :: x
+    // }
 
     /*
     function countBadPairs(nums: number[]): number {
@@ -389,14 +493,165 @@ module CountBadPairs {
     };
     */
 
-    method countBadPairsFaster(nums: seq<int>) returns (count: nat)
+    lemma DiffMapKeysPos(nums: seq<int>, diffMap: map<int, nat>, i: nat)
         requires |nums| > 0
-        ensures count == |BadPairs(nums)|
+        requires i < |nums|
+        requires diffMap.Keys == DiffsSet(nums[0..i])
+        requires nums[i] - i in diffMap
+        ensures diffMap.Keys == DiffsSet(nums[0..i+1])
     {
-        var badCount := 0;
-        var goodCount := 0;
-        ghost var diffIMap: map<int, nat> := map[];
-        var diffMap: map<int, nat> := map[];
+        var k :| k in diffMap.Keys && k == nums[i] - i;
+        assert k in DiffsSet(nums[0..i]);
+    }
+
+    lemma DiffMapKeysNeg(nums: seq<int>, diffMap: map<int, nat>, i: nat)
+        requires |nums| > 0
+        requires i < |nums|
+        requires diffMap.Keys == DiffsSet(nums[0..i])
+        requires nums[i] - i !in diffMap
+        ensures diffMap[(nums[i]-i) := 1].Keys == DiffsSet(nums[0..i+1])
+    {}
+
+    lemma {:verify false} goodPairsPosContinued(nums: seq<int>, i: nat, diffMap: map<int, nat>, diffCosets: map<int, set<nat>>, diff: int, goodPairs: set<(nat, nat)>)
+        requires i < |nums|
+        requires diff == nums[i] - i
+        requires diff in diffMap
+        requires diff in diffCosets
+        requires diff in DiffsSet(nums[0..i])
+        requires diffMap[diff] == |IndicesCoset(nums[0..i], diff)|
+        requires diffCosets[diff] == IndicesCoset(nums[0..i], diff)
+        requires goodPairs == AllCosetPairs(IndicesCosets(nums[0..i], DiffsSet(nums[0..i])))
+        ensures goodPairs + CosetToPairInPlusOne(diffCosets[diff], nums, i) == AllCosetPairs(IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1])))
+    {}
+
+    lemma {:isolate_assertions} IndicesCosetsCont(nums: seq<int>, i: nat, diff: int)
+        requires |nums| > 0
+        requires i < |nums|
+        requires diff == nums[i] - i
+        // requires diff !in DiffsSet(nums[0..i])
+        ensures IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1])) == IndicesCosets(nums[0..i], DiffsSet(nums[0..i])) + {IndicesCoset(nums[0..i+1], diff)}
+        decreases i
+    {
+        if i == 0 {
+            assert DiffsSet(nums[0..i]) == {};
+            assert IndicesCosets(nums[0..i], DiffsSet(nums[0..i])) == {};
+            assert nums[0..i+1] == [nums[0]];
+            assert i < |nums[0..i+1]|;
+            assert i in IndicesCoset(nums[0..i+1], diff);
+            assert IndicesCosets(nums[0..1], DiffsSet(nums[0..1])) == IndicesCosets(nums[0..i], DiffsSet(nums[0..i])) + {IndicesCoset(nums[0..i+1], diff)};
+        }else{
+            // assert nums == nums[0..i]+nums[i..];
+            // assert nums[0..i+1] == nums[0..i]+[nums[i]];
+            // IndicesCosetsCont(nums, i-1, nums[i-1] - (i-1));
+            if diff in DiffsSet(nums[0..i]) {
+                assert IndicesCoset(nums[0..i+1], diff) == IndicesCoset(nums[0..i], diff) + {i};
+            }else{
+                assert IndicesCoset(nums[0..i+1], diff) == {i};
+                assert IndicesCoset(nums[0..i], diff) == {};
+                assert nums[0..i+1] == nums[0..i]+[nums[i]];
+                assert {} in IndicesCosets(nums[0..i], DiffsSet(nums[0..i+1]));
+                assert IndicesCosets(nums[0..i], DiffsSet(nums[0..i+1])) == IndicesCosets(nums[0..i], DiffsSet(nums[0..i]))+ {{}} by {
+                    forall d | d in DiffsSet(nums[0..i+1])
+                        ensures d != diff ==> IndicesCoset(nums[0..i], d) == IndicesCoset(nums[0..i+1], d)
+                        ensures d == diff ==> IndicesCoset(nums[0..i], d) == {}
+                    {
+                        if d != diff {
+                        forall index | index in IndicesCoset(nums[0..i], d)
+                            ensures index in IndicesCoset(nums[0..i+1], d)
+                        {
+                            assert index < i;
+                            assert index < i+1;
+                            assert nums[0..i][index] == nums[0..i+1][index];
+                            assert nums[0..i][index]-index == d;
+                            assert nums[0..i+1][index]-index == d;
+                            assert index in IndicesCoset(nums[0..i], d);
+                            assert index in IndicesCoset(nums[0..i+1], d);
+                        }
+
+                        forall index | index in IndicesCoset(nums[0..i+1], d)
+                            ensures index in IndicesCoset(nums[0..i], d)
+                        {
+                            assert index != i;
+                            assert index < i;
+                            assert index < i+1;
+                            assert nums[0..i][index] == nums[0..i+1][index];
+                            assert nums[0..i][index]-index == d;
+                            assert nums[0..i+1][index]-index == d;
+                            assert index in IndicesCoset(nums[0..i], d);
+                        }
+                        }else{
+
+                        }
+                    }
+
+                    forall s | s in IndicesCosets(nums[0..i], DiffsSet(nums[0..i+1]))
+                        ensures s in IndicesCosets(nums[0..i], DiffsSet(nums[0..i]))+{{}}
+                    {
+                       var y :| y in DiffsSet(nums[0..i+1]) && s == IndicesCoset(nums[0..i+1], y); 
+                       if y != diff {
+                           assert s == IndicesCoset(nums[0..i], y);
+                           assert s in IndicesCosets(nums[0..i], DiffsSet(nums[0..i]));
+                       }else{
+                            assert s == {};
+                            assert s in IndicesCosets(nums[0..i], DiffsSet(nums[0..i]))+{{}};
+                       }
+                    }
+
+                    forall s | s in IndicesCosets(nums[0..i], DiffsSet(nums[0..i])) + {{}}
+                        ensures s in IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1]))
+                    {
+                    }
+                }
+                assert i < |nums[0..i+1]|;
+                assert nums[i] == nums[0..i+1][i];
+                assert diff in DiffsSet(nums[0..i+1]);
+            }
+            assert IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1])) == IndicesCosets(nums[0..i], DiffsSet(nums[0..i])) + {IndicesCoset(nums[0..i+1], diff)};
+        }
+    }
+
+    lemma {:isolate_assertions} goodPairsNegContinued(nums: seq<int>, i: nat, diffMap: map<int, nat>, diffCosets: map<int, set<nat>>, diff: int, goodPairs: set<(nat, nat)>)
+        requires i < |nums|
+        requires diff == nums[i] - i
+        requires diff !in DiffsSet(nums[0..i])
+        requires diff !in diffMap
+        requires diff !in diffCosets
+        // requires diffMap[diff] == |IndicesCoset(nums[0..i], diff)|
+        // requires diffCosets[diff] == IndicesCoset(nums[0..i], diff)
+        requires goodPairs == AllCosetPairs(IndicesCosets(nums[0..i], DiffsSet(nums[0..i])))
+        ensures goodPairs == AllCosetPairs(IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1])))
+    {
+        assert diff !in DiffsSet(nums[0..i]);
+        assert forall k :: 0 <= k < i ==> (nums[k] - k) != diff; 
+        assert diff in DiffsSet(nums[0..i+1]);
+        var ics := IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1]));
+        var diffCoset :| diffCoset in ics && diffCoset == IndicesCoset(nums[0..i+1], diff);
+        assert diffCoset == {i} by {
+            assert nums == nums[0..i+1]+nums[i+1..];
+            if diffCoset != {i} {
+                assert i < |nums[0..i+1]|;
+                assert nums[i] == nums[0..i+1][i];
+                assert diff == nums[0..i+1][i] - i;
+                assert i in diffCoset;
+                assert diffCoset != {};
+                if k :| k in diffCoset && k != i {
+                    assert k < i;
+                    assert nums[k] -k == diff;
+                    assert false;
+                }
+
+                assert false;
+            }
+        }
+        assert |diffCoset| == 1;
+        assert CosetToPairs(diffCoset) == {};
+        IndicesCosetsCont(nums, i, diff);
+        assert IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1])) == IndicesCosets(nums[0..i], DiffsSet(nums[0..i]))+{diffCoset};
+        AllCosetPairsPlusOne(IndicesCosets(nums[0..i], DiffsSet(nums[0..i])), diffCoset);
+        assert AllCosetPairs(IndicesCosets(nums[0..i], DiffsSet(nums[0..i]))) == AllCosetPairs(IndicesCosets(nums[0..i+1], DiffsSet(nums[0..i+1])));
+    }
+
+
         /*
         essentially diff map is counting the number of indices that have the same difference
         between the value and the index. If the difference is the same for two indices, then
@@ -412,25 +667,64 @@ module CountBadPairs {
         more good pairs (t,w), (x,w), (y,w), (z,w)
 
         */
+    method {:verify false} countBadPairsFaster(nums: seq<int>) returns (count: nat)
+        requires |nums| > 0
+        ensures count == |BadPairs(nums)|
+    {
+        var badCount := 0;
+        var goodCount := 0;
+        ghost var goodPairs: set<(nat, nat)> := {};
+        ghost var diffCosets: map<int, set<nat>> := map[];
+        ghost var diffCosetPairsMap: map<int, set<(nat, nat)>> := map[];
+        var diffMap: map<int, nat> := map[];
+        assert diffMap.Keys == {};
         for i := 0 to |nums|
             invariant 0 <= i <= |nums|
             invariant forall k :: 0 <= k < i ==> nums[k] - k in diffMap
-            invariant forall diff :: diff in diffMap ==> diff in diffIMap
-            invariant forall diff :: diff in diffIMap.Keys ==> 0 <= diffIMap[diff] < |nums| && (nums[diffIMap[diff]] - diffIMap[diff] == diff)
+            invariant forall diff :: diff in  DiffsSet(nums[0..i]) ==> diff in diffMap.Keys
+            invariant DiffsSet(nums[0..i]) == diffMap.Keys
+            // invariant forall diff :: diff in  DiffsSet(nums[0..i]) ==> diff in diffMap.Keys
+            invariant diffCosets.Keys == diffMap.Keys
+            //invariant forall diff :: diff in DiffsSet(nums[0..i]) ==> diff in diffCosetPairsMap
+            invariant forall diff :: diff in DiffsSet(nums[0..i]) ==> diffCosets[diff] == IndicesCoset(nums[0..i], diff)
+            invariant forall diff :: diff in DiffsSet(nums[0..i]) ==> diffMap[diff] == |IndicesCoset(nums[0..i], diff)|
+            invariant diffCosets.Values == IndicesCosets(nums[0..i], DiffsSet(nums[0..i]))
+            invariant goodPairs == AllCosetPairs(diffCosets.Values)
+            invariant goodCount == |goodPairs|
+            // invariant forall diff :: diff in diffMap ==> diffCosetPairsMap[diff] == CosetToPairs(diffCosets[diff])
+
+            // invariant forall diff :: diff in diffIMap.Keys ==> 0 <= diffIMap[diff] < |nums| && (nums[diffIMap[diff]] - diffIMap[diff] == diff)
             // invariant forall diff :: diff in diffMap ==> diffMap[diff] == |GoodPairsIK(nums, diff + i)|
             //invariant goodCount == |GoodPairsI(nums, i)|
             // invariant badCount == |BadPairs(nums)|
         {
             var diff := nums[i]-i;
             if diff in diffMap {
+                DiffMapKeysPos(nums, diffMap, i);
+                goodPairsPosContinued(nums, i, diffMap, diffCosets, diff, goodPairs);
+                assert diff in DiffsSet(nums[0..i]);
+                assert diff in diffCosets;
+                IndicesCosetsContinuedPos(nums, i, diffCosets, diffMap, diff);
                 var count := diffMap[diff];
                 goodCount := goodCount + count;
                 diffMap := diffMap[diff := count + 1];
+                diffCosets := diffCosets[diff := diffCosets[diff]+{i}];
+                goodPairs := goodPairs + CosetToPairInPlusOne(diffCosets[diff], nums, i);
+                // diffCosetPairsMap := diffCosetPairsMap[diff := diffCosetPairsMap[diff] + CosetToPairInPlusOne(diffCosets[diff], nums, i)];
             }else{
+                DiffMapKeysNeg(nums, diffMap, i);
+                IndicesCosetsContinuedNeg(nums, i, diffCosets, diffMap, diff);
+                goodPairsNegContinued(nums, i, diffMap, diffCosets, diff, goodPairs);
                 diffMap := diffMap[diff := 1];
-                diffIMap := diffIMap[diff := i];
+                diffCosets := diffCosets[diff := {i}];
+                assert CosetToPairs(diffCosets[diff]) == {};
+                // diffCosetPairsMap := diffCosetPairsMap[diff := CosetToPairs(diffCosets[diff])];
             }
         }
+        assert nums[..|nums|] == nums;
+        assert diffCosets.Values == IndicesCosets(nums, DiffsSet(nums));
+        AllCosetsEqualAllGoodPairs(nums);
+        // assert Union(diffCosetPairsMap.Values) == AllCosetPairs(IndicesCosets(nums, DiffsSet(nums)));
         assert goodCount == |GoodPairs(nums)|;
         BadPairsSize(nums);
         GoodPairsSize(nums);
