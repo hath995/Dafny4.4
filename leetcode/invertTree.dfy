@@ -191,6 +191,38 @@ module InvertBinaryTree {
     if root.left != null && root.right != null then [root]+PreorderTraversal(root.left)+PreorderTraversal(root.right) else if root.left != null then [root]+PreorderTraversal(root.left) else if root.right != null then [root]+PreorderTraversal(root.right) else [root]
     }
 
+    function PreorderTraversal2(root: TreeNode?) : seq<TreeNode>
+        reads set x | root != null && x in root.repr
+        requires root != null ==> root.Valid()
+        decreases set x | root != null && x in root.repr
+        ensures forall x :: x in PreorderTraversal2(root) ==> x.Valid()
+    {
+        if root == null then
+            []
+        else
+            assert root.Valid();
+            assert root.repr != {};
+            assert root.repr > set x | root.left != null && x in root.left.repr;
+            assert root.repr > set x | root.right != null && x in root.right.repr;
+            [root] + PreorderTraversal2(root.left) + PreorderTraversal2(root.right)
+    }
+
+    lemma TheyAreEqual(root: TreeNode)
+        requires root.Valid()
+        ensures PreorderTraversal(root) == PreorderTraversal2(root)
+        decreases root.repr
+    {
+        assert root.Valid();
+        if root.left != null && root.right != null {
+            TheyAreEqual(root.left);
+            TheyAreEqual(root.right);
+        }else if root.left != null && root.right == null {
+            TheyAreEqual(root.left);
+        }else if root.left == null && root.right != null {
+            TheyAreEqual(root.right);
+        }
+    }
+
     lemma traversalSize(root: TreeNode)
         requires root.Valid()
         ensures |PreorderTraversal(root)| == root.TreeSize()
