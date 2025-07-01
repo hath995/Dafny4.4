@@ -206,11 +206,11 @@ module SortedSet {
         }
 
 
-        method {:isolate_assertions} Union(ss: GrowableSortedSet) returns (result: GrowableSortedSet)
+        method Union(ss: GrowableSortedSet) returns (result: GrowableSortedSet)
             requires Valid()
             requires ss.Valid()
-            ensures forall x :: x in this.elems[..nElems] ==> x in result.elems
-            ensures forall x :: x in ss.elems[..ss.nElems] ==> x in result.elems
+            // ensures forall x :: x in this.elems[..nElems] ==> x in result.elems
+            // ensures forall x :: x in ss.elems[..ss.nElems] ==> x in result.elems
             ensures ToSet(result.elems) == ToSet(this.elems[..nElems])+ToSet(ss.elems[..ss.nElems])
             ensures result.Valid()
         {
@@ -222,12 +222,15 @@ module SortedSet {
             for i := 0 to this.nElems
                 invariant result.Valid()
                 invariant fresh(result.Repr)
-                invariant ToSet(this.elems[..i]) !! ToSet(this.elems[i..])
-                invariant forall x :: x in this.elems[i..] ==> x !in result.elems
+                invariant ToSet(this.elems[..i]) !! ToSet(this.elems[i..nElems])
+                invariant forall x :: x in this.elems[i..nElems] ==> x !in result.elems
                 invariant sumSet == ToSet(this.elems[..i])
                 invariant ToSet(result.elems) == sumSet
             {
-                var index := result.AddValue(this.arr[i]);
+                OrderedImpliesDistinct(result.arr, result.elems, result.nElems);
+                ElementAppendedOne(result.elems, sumSet, this.elems, this.nElems, i);
+                result.AppendValue(this.arr[i]);
+                assert this.elems[i] == this.arr[i];
                 assert this.elems[..i+1] == this.elems[..i]+[this.arr[i]];
                 ToSetConcat(this.elems[..i], [this.arr[i]]);
                 sumSet := sumSet + {this.arr[i]};
@@ -236,19 +239,33 @@ module SortedSet {
             for i := 0 to ss.nElems
                 invariant result.Valid()
                 invariant fresh(result.Repr)
-                invariant ToSet(ss.elems[..i]) !! ToSet(ss.elems[i..])
+                invariant ToSet(ss.elems[..i]) !! ToSet(ss.elems[i..ss.nElems])
                 invariant ToSet(result.elems) == sumSet
                 invariant sumSet == ToSet(this.elems[..this.nElems]) + ToSet(ss.elems[..i])
             {
+                ghost var oldElems := result.elems;
                 var has_value := result.HasValue(ss.arr[i]);
                 if !has_value {
                     var index := result.AddValue(ss.arr[i]);
-                    assert ss.elems[..i+1] == ss.elems[..i]+ [ss.arr[i]];
+                    ElementInserted(oldElems, sumSet, this.elems, this.nElems, ss.elems, ss.nElems, i, index);
+                    assert 0 <= i < ss.nElems;
+                    assert ss.arr[i] == ss.elems[i];
                     ToSetConcat(ss.elems[..i], [ss.arr[i]]);
                     ToSetConcat(this.elems[..this.nElems], ss.elems[..i+1]);
+                    SetsCombined(sumSet, this.elems, this.nElems, ss.elems, ss.nElems, i);
                     sumSet := sumSet + {ss.arr[i]};
+                }else{
+                    assert 0 <= i < ss.nElems;
+                    assert ss.arr[i] == ss.elems[i];
+                    assert ss.arr[i] in sumSet;
+                    assert ss.elems[i] in sumSet;
+                    SetsCombined2(sumSet, this.elems, this.nElems, ss.elems, ss.nElems, i);
                 }
+                SortedArrayIsDisjoint(ss.arr, ss.nElems, ss.elems, i+1);
             }
+            assert sumSet == ToSet(this.elems[..this.nElems]) + ToSet(ss.elems[..ss.nElems]);
+            // SetsCombinedImplies(result.elems, this.elems, nElems, ss.elems, ss.nElems);
+            // assert ToSet(result.elems) == sumSet;
            
 
         }
@@ -256,8 +273,8 @@ module SortedSet {
         method {:isolate_assertions} Union2(ss: GrowableSortedSet) returns (result: GrowableSortedSet)
             requires Valid()
             requires ss.Valid()
-            ensures forall x :: x in this.elems[..nElems] ==> x in result.elems
-            ensures forall x :: x in ss.elems[..ss.nElems] ==> x in result.elems
+            // ensures forall x :: x in this.elems[..nElems] ==> x in result.elems
+            // ensures forall x :: x in ss.elems[..ss.nElems] ==> x in result.elems
             ensures ToSet(result.elems) == ToSet(this.elems[..nElems])+ToSet(ss.elems[..ss.nElems])
             ensures result.Valid()
         {
@@ -372,6 +389,19 @@ module SortedSet {
 
     }
 
+    lemma ToSetPlusOne<T>(xs: seq<T>, x: T)
+        requires x !in ToSet(xs)
+        requires Distinct(xs)
+        ensures ToSet(xs + [x]) == ToSet(xs) + {x}
+    {
+        if xs == [] {
+            assert ToSet([x]) == {x};
+        }else{
+            assert xs[0] != x;
+            ToSetPlusOne(xs[1..], x);
+        }
+    }
+
     twostate lemma ArrayShift(arr: array<int>, index: nat, nElems: nat)
         requires 0 < index <= nElems < arr.Length
         requires arr[index+1..nElems+1] == old(arr[index..nElems])
@@ -393,6 +423,107 @@ module SortedSet {
     {
         forall j,k :: 0 <= j < k  < nElems ==> arr[j] < arr[k]
     }
+
+    lemma SortedArrayIsDisjoint(arr: array<int>, nElems: nat, elems: seq<int>, i: nat)
+        requires nElems <= arr.Length
+        requires SortedArray(arr, nElems)
+        requires nElems == |elems|
+        requires forall i: nat :: i < nElems ==> arr[i] == elems[i]
+        requires i <= nElems
+        ensures ToSet(elems[..i]) !! ToSet(elems[i..nElems])
+    {
+
+    }
+
+    lemma SetsCombined(ss: set<int>, thisElems: seq<int>, nElems: nat, ssElems: seq<int>, ssNelems: nat, i: nat)
+        requires |thisElems| == nElems
+        requires i < ssNelems
+        requires |ssElems| == ssNelems
+        requires ssElems[i] !in ss
+        requires ss == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i])
+        requires ss+{ssElems[i]} == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i+1])
+    {
+
+    }
+
+    lemma SetsCombined2(ss: set<int>, thisElems: seq<int>, nElems: nat, ssElems: seq<int>, ssNelems: nat, i: nat)
+        requires |thisElems| == nElems
+        requires i < ssNelems
+        requires |ssElems| == ssNelems
+        requires ssElems[i] in ss
+        requires ss == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i])
+        requires ss == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i+1])
+    {
+
+    }
+
+    lemma SetsCombinedImplies(res: seq<int>, thisElems: seq<int>, nElems: nat, ssElems: seq<int>, ssNelems: nat)
+        requires |thisElems| == nElems
+        requires |ssElems| == ssNelems
+        requires ToSet(res) == ToSet(thisElems[..nElems]) + ToSet(ssElems[..ssNelems])
+        ensures forall x :: x in thisElems[..nElems] ==> x in res
+        ensures forall x :: x in ssElems[..ssNelems] ==> x in res
+    {
+
+    }
+
+    lemma ElementInserted(resultElems: seq<int>, ss: set<int>,  thisElems: seq<int>, nElems: nat, ssElems: seq<int>, ssNelems: nat, i: nat, index: nat)
+        requires |thisElems| == nElems
+        requires i < ssNelems
+        requires |ssElems| == ssNelems
+        requires ssElems[i] !in ss
+        requires ss == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i])
+        requires index <= |resultElems|
+        requires ToSet(resultElems) == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i])
+        ensures ToSet(resultElems[..index]+[ssElems[i]]+resultElems[index..]) == ss+{ssElems[i]}
+    {
+
+    }
+
+    lemma ElementAppendedOne(resultElems: seq<int>, ss: set<int>,  thisElems: seq<int>, nElems: nat, i: nat)
+        requires |thisElems| == nElems
+        requires i < nElems
+        requires thisElems[i] !in ss
+        // requires Distinct(thisElems)
+        requires Distinct(resultElems)
+        requires ToSet(resultElems) == ss
+        requires ss == ToSet(thisElems[..i])
+        ensures ToSet(resultElems + [thisElems[i]]) == ss+{thisElems[i]}
+    {
+        assert thisElems[i] !in ToSet(resultElems);
+        ToSetPlusOne(resultElems, thisElems[i]);
+    }
+
+    // lemma ElementAppendedTwo(resultElems: seq<int>, ss: set<int>,  thisElems: seq<int>, nElems: nat, ssElems: seq<int>, ssNelems: nat, i: nat)
+    //     requires |thisElems| == nElems
+    //     requires i < ssNelems
+    //     requires |ssElems| == ssNelems
+    //     requires ssElems[i] !in ss
+    //     requires ss == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i])
+    //     requires ToSet(resultElems) == ToSet(thisElems[..nElems]) + ToSet(ssElems[..i])
+    //     ensures ToSet(resultElems[ssElems[i]]) == ss+{ssElems[i]}
+    // {
+
+    // }
+
+    predicate Distinct<T(==)>(ss: seq<T>) {
+        forall i, j :: 0 <= i < j < |ss| ==> ss[i] != ss[j]
+    }
+
+    lemma OrderedImpliesDistinct(arr: array<int>, elems: seq<int>, nElems: nat)
+        requires nElems <= arr.Length
+        requires nElems == |elems|
+        requires OrderedArray(arr, nElems)
+        requires forall i :: 0 <= i < nElems ==> arr[i] == elems[i]
+        ensures Distinct(elems)
+    {
+        forall i, j | 0 <= i < j < nElems
+            ensures elems[i] != elems[j]
+        {
+            IncreasingIndexIsGreater(arr, nElems, i, j);
+        }
+    }
+
 
     lemma IncreasingIndexIsGreater(arr: array<int>, nElems: nat, i: nat, j: nat)
         requires nElems <= arr.Length
