@@ -214,85 +214,42 @@ module SortedSet {
             ensures ToSet(result.elems) == ToSet(this.elems[..nElems])+ToSet(ss.elems[..ss.nElems])
             ensures result.Valid()
         {
+            OrderedImpliesSorted(this.arr, nElems);
+            OrderedImpliesSorted(ss.arr, ss.nElems);
             result := new GrowableSortedSet(ss.arr.Length + this.arr.Length);
-            ghost var thisSet := ToSet(this.elems[..nElems]);
-            ghost var thatSet := ToSet(ss.elems[..ss.nElems]);
             assert ss.nElems + this.nElems <= ss.arr.Length + this.arr.Length;
             ghost var sumSet: set<int>  := {};
-            var i := 0;
-            var j := 0;
-            while i + j < ss.nElems + this.nElems
-                invariant 0 <= i <= this.nElems
-                invariant 0 <= j <= ss.nElems
-                invariant fresh(result.Repr)
-                invariant ToSet(result.elems) == sumSet
-                invariant sumSet == ToSet(this.elems[..i] + ss.elems[..j])
+            for i := 0 to this.nElems
                 invariant result.Valid()
+                invariant fresh(result.Repr)
+                invariant ToSet(this.elems[..i]) !! ToSet(this.elems[i..])
+                invariant forall x :: x in this.elems[i..] ==> x !in result.elems
+                invariant sumSet == ToSet(this.elems[..i])
+                invariant ToSet(result.elems) == sumSet
             {
-                if i < this.nElems && j < ss.nElems {
-                    if this.arr[i] == ss.arr[j] {
-                        var has_value := result.HasValue(this.arr[i]);
-                        assert this.elems[..i+1] == this.elems[..i]+[this.arr[i]];
-                        assert ss.elems[..j+1] == ss.elems[..j]+[ss.arr[j]];
-                        ToSetConcat(this.elems[..i], [this.arr[i]]);
-                        ToSetConcat(ss.elems[..j], [ss.arr[j]]);
-                        ToSetConcat(this.elems[..i+1], ss.elems[..j]);
-                        ToSetConcat(this.elems[..i+1], ss.elems[..j+1]);
-                        if !has_value {
-                            var index := result.AddValue(this.arr[i]);
-                            sumSet := sumSet + {this.arr[i]};
-                        }
-                        i := i + 1;
-                        j := j + 1;
-                    }else if this.arr[i] < ss.arr[j] {
-                        var has_value := result.HasValue(this.arr[i]);
-                        assert this.elems[..i+1] == this.elems[..i]+[this.arr[i]];
-                        ToSetConcat(this.elems[..i], [this.arr[i]]);
-                        ToSetConcat(this.elems[..i+1], ss.elems[..j]);
-                        if !has_value {
-                            var index := result.AddValue(this.arr[i]);
-                            sumSet := sumSet + {this.arr[i]};
-                        }
-                        i := i + 1;
-                    }else{
-                        assert j < ss.nElems;
-                        var has_value := result.HasValue(ss.arr[j]);
-                        assert ss.elems[..j+1] == ss.elems[..j]+[ss.arr[j]];
-                        ToSetConcat(ss.elems[..j], [ss.arr[j]]);
-                        ToSetConcat(this.elems[..i], ss.elems[..j+1]);
-                        if !has_value {
-                            var index := result.AddValue(ss.arr[j]);
-                            sumSet := sumSet + {ss.arr[j]};
-                        }
-                        j := j + 1;
-                    }
-                }else if i < this.nElems {
-                    var has_value := result.HasValue(this.arr[i]);
-                    assert this.elems[..i+1] == this.elems[..i]+[this.arr[i]];
-                    ToSetConcat(this.elems[..i], [this.arr[i]]);
-                    ToSetConcat(this.elems[..i+1], ss.elems[..j]);
-                    if !has_value {
-                        var index := result.AddValue(this.arr[i]);
-                        sumSet := sumSet + {this.arr[i]};
-                    }
-                    i := i + 1;
-                }else {
-                    assert j < ss.nElems;
-                    var has_value := result.HasValue(ss.arr[j]);
-                    assert ss.elems[..j+1] == ss.elems[..j]+[ss.arr[j]];
-                    ToSetConcat(ss.elems[..j], [ss.arr[j]]);
-                    ToSetConcat(this.elems[..i], ss.elems[..j+1]);
-                    if !has_value {
-                        var index := result.AddValue(ss.arr[j]);
-                            sumSet := sumSet + {ss.arr[j]};
-                    }
-                    j := j + 1;
+                var index := result.AddValue(this.arr[i]);
+                assert this.elems[..i+1] == this.elems[..i]+[this.arr[i]];
+                ToSetConcat(this.elems[..i], [this.arr[i]]);
+                sumSet := sumSet + {this.arr[i]};
+            }
+
+            for i := 0 to ss.nElems
+                invariant result.Valid()
+                invariant fresh(result.Repr)
+                invariant ToSet(ss.elems[..i]) !! ToSet(ss.elems[i..])
+                invariant ToSet(result.elems) == sumSet
+                invariant sumSet == ToSet(this.elems[..this.nElems]) + ToSet(ss.elems[..i])
+            {
+                var has_value := result.HasValue(ss.arr[i]);
+                if !has_value {
+                    var index := result.AddValue(ss.arr[i]);
+                    assert ss.elems[..i+1] == ss.elems[..i]+ [ss.arr[i]];
+                    ToSetConcat(ss.elems[..i], [ss.arr[i]]);
+                    ToSetConcat(this.elems[..this.nElems], ss.elems[..i+1]);
+                    sumSet := sumSet + {ss.arr[i]};
                 }
             }
-            assert i == this.nElems;
-            assert j == ss.nElems;
-            ToSetConcat(this.elems[..this.nElems], ss.elems[..ss.nElems]);
-            // assume sumSet == ToSet(this.elems[..i] + ss.elems[..j]);
+           
 
         }
 
@@ -304,9 +261,9 @@ module SortedSet {
             ensures ToSet(result.elems) == ToSet(this.elems[..nElems])+ToSet(ss.elems[..ss.nElems])
             ensures result.Valid()
         {
+            OrderedImpliesSorted(this.arr, nElems);
+            OrderedImpliesSorted(ss.arr, ss.nElems);
             result := new GrowableSortedSet(ss.arr.Length + this.arr.Length);
-            ghost var thisSet := ToSet(this.elems[..nElems]);
-            ghost var thatSet := ToSet(ss.elems[..ss.nElems]);
             assert ss.nElems + this.nElems <= ss.arr.Length + this.arr.Length;
             ghost var sumSet: set<int>  := {};
             var i := 0;
@@ -321,6 +278,7 @@ module SortedSet {
                 invariant sumSet == ToSet(this.elems[..i] + ss.elems[..j])
                 invariant result.Valid()
             {
+                OrderedImpliesSorted(result.arr, result.nElems);
                 if i < this.nElems && j < ss.nElems {
                     if this.arr[i] == ss.arr[j] {
                         var has_value := result.HasValue(this.arr[i]);
@@ -384,8 +342,6 @@ module SortedSet {
             assert i == this.nElems;
             assert j == ss.nElems;
             ToSetConcat(this.elems[..this.nElems], ss.elems[..ss.nElems]);
-            // assume sumSet == ToSet(this.elems[..i] + ss.elems[..j]);
-
         }
 
 
