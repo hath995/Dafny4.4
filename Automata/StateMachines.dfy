@@ -1,5 +1,6 @@
-
 module StateMachines {
+  export reveals *
+
     datatype DFA<!State(==), !Alphabet(==)> = DFA(
         states: set<State>,
         alphabet: set<Alphabet>,
@@ -20,6 +21,533 @@ module StateMachines {
         d.acceptStates <= d.states &&
         ValidTransitionFunction(d)
     }
+
+    datatype RegExp<Alphabet(==)> = 
+  | Empty                           // ∅ - empty language
+  | Epsilon                         // ε - empty string
+  | Symbol(c: Alphabet)                 // single character
+  | Union(left: RegExp, right: RegExp)      // r1 ∪ r2
+  | Concat(left: RegExp, right: RegExp)     // r1 · r2
+  | Star(r: RegExp)                 // r*
+
+// Define what it means for a string to match a regular expression
+predicate Matches<Alphabet(==)>(r: RegExp<Alphabet>, s: seq<Alphabet>)
+  decreases r, |s|
+{
+  match r
+  case Empty => false
+  case Epsilon => |s| == 0
+  case Symbol(c) => |s| == 1 && s[0] == c
+  case Union(r1, r2) => Matches(r1, s) || Matches(r2, s)
+  case Concat(r1, r2) => 
+    (exists k :: 0 <= k <= |s| && Matches(r1, s[..k]) && Matches(r2, s[k..]))
+  case Star(r') => 
+    s == [] || 
+    // (exists k :: 1 <= k <= |s| && Matches(r', s[..k]) && Matches(Star(r'), s[k..]))
+    (exists k :: 1 <= k < |s| && Matches(r', s[..k]) && Matches(Star(r'), s[k..])) ||
+    (Matches(r', s))
+}
+
+ghost function V<Alphabet(!new,==)>(base: iset<seq<Alphabet>>, n: nat): iset<seq<Alphabet>> {
+    if n == 0 then iset{[]} 
+    else if n == 1 then base else
+    iset w,v | w in V(base, n-1) && v in base :: v+w
+}
+
+ghost function Kleene<Alphabet(!new,==)>(base: iset<seq<Alphabet>>): iset<seq<Alphabet>>
+{
+    iset x, n | x in V(base, n) :: x
+}
+
+lemma EmptyStringIsInKleene<Alphabet(!new,==)>(base: iset<seq<Alphabet>>)
+    ensures [] in Kleene(base)
+{
+    // Goal: To show `[] in Kleene(base)`, we must find a witness `n`
+    // such that `[] in V(base, n)`.
+
+    // Let's choose our witness n = 0.
+    var n: nat := 0;
+
+    // By definition of V, V(base, 0) is iset{[]}.
+    var V_n0 := V(base, 0);
+    assert V_n0 == iset{[]};
+
+    // Therefore, the empty string `[]` is an element of V(base, 0).
+    assert [] in V_n0;
+
+    // Since `[]` is in `V(base, n)` for our chosen `n`, it must be
+    // in the larger set `Kleene(base)` by definition of Kleene.
+    // The existential `exists n :: [] in V(base, n)` is satisfied.
+    assert [] in Kleene(base);
+}
+
+lemma BaseIsSubsetOfKleene<Alphabet(!new,==)>(base: iset<seq<Alphabet>>)
+    ensures base <= Kleene(base)
+{
+    // To prove a subset relation `A <= B`, we must show that for any
+    // arbitrary element `s` in `A`, it is also in `B`.
+    forall s | s in base
+        ensures s in Kleene(base)
+    {
+        // Goal: To show `s in Kleene(base)`, we must find a witness `n`
+        // such that `s in V(base, n)`.
+
+        // Let's choose our witness n = 1.
+        var n: nat := 1;
+
+        // By definition of V, V(base, 1) is simply `base`.
+        var V_n1 := V(base, 1);
+        assert V_n1 == base;
+
+        // Since we are assuming `s in base`, and `V(base, 1) == base`,
+        // it must be that `s` is in `V(base, 1)`.
+        assert s in V_n1;
+
+        // Since `s` is in `V(base, n)` for our chosen `n`, it must be
+        // in the larger set `Kleene(base)` by definition of Kleene.
+        assert s in Kleene(base);
+    }
+}
+
+lemma V_concat_lemma<Alphabet(!new,==)>(base: iset<seq<Alphabet>>, w: seq<Alphabet>, v: seq<Alphabet>, n: nat, m: nat)
+    requires w in V(base, n)
+    requires v in V(base, m)
+    ensures w+v in V(base, n+m)
+    decreases n // We induct on n, the size of the first string `w`.
+{
+    if n == 0 {
+        // Base Case: w is built from 0 elements.
+        // `requires w in V(base, 0)` implies w must be the empty string.
+        assert w == [];
+        
+        // Our goal is `w+v in V(base, 0+m)`, which is `[]+v in V(base, m)`.
+        // This simplifies to `v in V(base, m)`, which is true by the lemma's `requires` clause.
+        assert w+v == v;
+        assert w+v in V(base, m);
+    } 
+    else { // n > 0, the Inductive Step
+        // Since `w in V(base, n)` and n > 0, we can decompose `w` according
+        // to the new definition of V.
+        var w_prefix, w_suffix :| w == w_prefix + w_suffix && w_prefix in base && w_suffix in V(base, n-1);
+
+        // Our goal is to prove `w+v in V(base, n+m)`.
+        // Let's substitute our decomposition of `w`:
+        // (w_prefix + w_suffix) + v in V(base, n+m)
+        
+        // By the associativity of string concatenation, this is equal to:
+        // w_prefix + (w_suffix + v)
+        assert w+v == w_prefix + (w_suffix + v);
+
+        // Now, let's analyze the inner part: `w_suffix + v`.
+        // We have `w_suffix in V(base, n-1)` and `v in V(base, m)`.
+        // This is exactly the premise of our lemma, but for a smaller `n`.
+        // We can make a recursive call (this is the induction hypothesis).
+        V_concat_lemma(base, w_suffix, v, n-1, m);
+        
+        // The `ensures` clause of the recursive call gives us a crucial fact:
+        var new_suffix := w_suffix + v;
+        assert new_suffix in V(base, (n-1)+m);
+        assert new_suffix in V(base, n+m-1);
+
+        // Our goal has now become: `w_prefix + new_suffix in V(base, n+m)`.
+        // Let's look at the definition of `V(base, n+m)`.
+        // Since n > 0, n+m >= 1. The definition is `iset v',w' | v' in base && w' in V(base, n+m-1) :: v'+w'`.
+        
+        // This is a perfect match! We have witnesses for this set comprehension:
+        // 1. `v' := w_prefix`. We know `w_prefix in base`.
+        // 2. `w' := new_suffix`. We just proved `new_suffix in V(base, n+m-1)`.
+        
+        // Since our witnesses satisfy the conditions, their concatenation must be in the set.
+        assert w_prefix + new_suffix in V(base, n+m);
+        
+        // Therefore, our original goal is proven.
+        assert w+v in V(base, n+m);
+    }
+}
+
+
+
+lemma MatchesImpliesLanguage<Alphabet(!new,==)>(r: RegExp<Alphabet>, s: seq<Alphabet>)
+    requires r.Star?
+    // This is the essential Induction Hypothesis from the (unstated) outer structural induction.
+    requires forall s' :: Matches(r.r, s') <==> s' in RegexLanguage(r.r)
+    
+    // Original requirements
+    requires Matches(r, s)
+    ensures s in RegexLanguage(r)
+    decreases |s|, r
+{
+    var r_prime := r.r;
+    var baseLang := RegexLanguage(r_prime);
+
+    // Goal: Show `s in Kleene(baseLang)`. This means finding an `n` where `s in V(baseLang, n)`.
+
+    // We proceed by cases on why `Matches(Star(r_prime), s)` is true.
+    if s == [] {
+        // Case 1: The empty string.
+        // We need to find an n where [] in V(baseLang, n). We choose n=0.
+        assert [] in V(baseLang, 0);
+        // Therefore, [] is in the Kleene set.
+        assert [] in Kleene(baseLang);
+    }
+    else if Matches(r_prime, s) {
+        // Case 2: `s` itself is one string from the base language.
+        // We need an n where s in V(baseLang, n). We choose n=1.
+        // V(baseLang, 1) is just `baseLang`.
+        // By the Induction Hypothesis (from requires), `Matches(r_prime, s)` implies `s in baseLang`.
+        // RegexMatchLanguageLemma(r_prime);
+        assert s in baseLang;
+        assert s in V(baseLang, 1);
+        assert s in Kleene(baseLang);
+    }
+    else // Case 3: The recursive existential `exists k...` holds.
+    {
+        var k :| 1 <= k < |s| && Matches(r_prime, s[..k]) && Matches(Star(r_prime), s[k..]);
+        var p := s[..k];
+        var suffix := s[k..];
+
+        // Part A: Analyze the prefix `p`.
+        // We know `Matches(r_prime, p)`. By the IH, this means `p in baseLang`.
+        // RegexMatchLanguageLemma(r_prime);
+        assert p in baseLang;
+        // This is equivalent to `p in V(baseLang, 1)`.
+        
+        // Part B: Analyze the `suffix`.
+        // We know `Matches(Star(r_prime), suffix)`. This is our lemma on a shorter string.
+        // We can make a recursive call.
+        MatchesImpliesLanguage(r, suffix);
+        // The recursive call ensures `suffix in RegexLanguage(r)`, which is `suffix in Kleene(baseLang)`.
+        assert suffix in Kleene(baseLang);
+
+        // By definition of `Kleene`, this means there exists some `m` for the suffix.
+        var m:nat :| suffix in V(baseLang, m);
+
+        // Part C: Combine them.
+        // We have `p in V(baseLang, 1)` and `suffix in V(baseLang, m)`.
+        // Now we use our powerful helper lemma!
+        V_concat_lemma(baseLang, p, suffix, 1, m);
+        
+        // The helper ensures `p+suffix` is in `V(baseLang, 1+m)`.
+        assert p+suffix in V(baseLang, 1+m);
+        assert s == p + suffix;
+        // Since s = p+suffix, s is in `V` for n = 1+m.
+        assert s in V(baseLang, 1+m);
+        // Therefore, s is in the Kleene set.
+        assert s in Kleene(baseLang);
+    }
+
+    // In all cases, the `ensures` clause holds.
+}
+lemma ConcatMatchesStar<Alphabet(!new,==)>(r_prime: RegExp<Alphabet>, p: seq<Alphabet>, suffix: seq<Alphabet>)
+    // If p matches r' and suffix matches Star(r'), then p+suffix matches Star(r').
+    requires Matches(r_prime, p)
+    requires Matches(Star(r_prime), suffix)
+    ensures Matches(Star(r_prime), p+suffix)
+    decreases |suffix| // The induction is now on the length of the Star-matching part.
+{
+    // Our goal is to prove `Matches(Star(r_prime), p+suffix)`.
+    // Let s := p+suffix.
+    // We use the definition: `s==[] || (exists k...) || Matches(r_prime, s)`
+
+    // Since `Matches(r_prime, p)` is true, `p` cannot be empty unless the language of r_prime contains ε.
+    // In any case, `p+suffix` is likely not empty.
+    // Let's satisfy the `exists k...` clause.
+
+    // Let our witness be k := |p|.
+    // Since Matches(r_prime, p) is true, if p is not empty, then |p| >= 1.
+    // If p is empty, this choice of k=0 doesn't work for the 1<=k requirement.
+    
+    if |p| == 0 {
+        // If p is empty, then p+suffix == suffix.
+        // The goal becomes `Matches(Star(r_prime), suffix)`, which is true by the `requires` clause.
+        assert p+suffix == suffix;
+        assert Matches(Star(r_prime), p+suffix);
+    } else {
+        // Since p is not empty, |p| >= 1. Let k := |p|.
+        // We need to check the parts of the existential for `s = p+suffix`.
+        
+        // 1. `1 <= k < |s|` or `k = |s|`?
+        //    `k = |p|`, so `k >= 1`.
+        
+        // 2. Check `Matches(r_prime, s[..k])`.
+        //    `s[..k]` is `(p+suffix)[..|p|]`, which is `p`.
+        //    The condition is `Matches(r_prime, p)`, which is true by the `requires` clause.
+        
+        // 3. Check `Matches(Star(r_prime), s[k..])`.
+        //    `s[k..]` is `(p+suffix)[|p|..]`, which is `suffix`.
+        //    The condition is `Matches(Star(r_prime), suffix)`, which is true by the `requires` clause.
+
+        // We have a `k` (|p|) that satisfies the original `exists k: 1 <= k <= |s|` definition.
+        // Let's see if it works for your symmetric one.
+        if |suffix| == 0 {
+            // Then k = |p| = |s|.
+            // This means we need to satisfy the `Matches(r_prime, s)` clause.
+            // Our s is `p`. We know `Matches(r_prime, p)`. This works.
+            assert p+suffix == p;
+            assert Matches(Star(r_prime), p+suffix);
+        } else {
+            // Then k = |p| < |p|+|suffix| = |s|.
+            // This satisfies the `exists k: 1 <= k < |s|` clause.
+            var s := p+suffix;
+            assert 1 <= |p| < |s|;
+            assert Matches(r_prime, s[..|p|]);
+            assert Matches(Star(r_prime), s[|p|..]);
+            assert Matches(Star(r_prime), p+suffix);
+        }
+    }
+}
+
+lemma LanguageImpliesMatches_V_Helper<Alphabet(!new,==)>(r_prime: RegExp<Alphabet>, s: seq<Alphabet>, n: nat)
+    requires forall s' :: s' in RegexLanguage(r_prime) <==> Matches(r_prime, s')
+    requires s in V(RegexLanguage(r_prime), n)
+    ensures Matches(Star(r_prime), s)
+    decreases n
+{
+    var baseLang := RegexLanguage(r_prime);
+    
+    if n == 0 {
+        // Base case: s is in V(base, 0), so s must be [].
+        assert s == [];
+        // The first clause of Matches(Star...) is `s == []`, so the goal holds.
+        assert Matches(Star(r_prime), s);
+    } else { // n > 0, the inductive step
+        // By our new definition of V, s can be written as v + w,
+        // where v is from the base and w is built from n-1 pieces.
+        var v, w :| s == v + w && v in baseLang && w in V(baseLang, n-1);
+
+        // Part 1: Analyze the prefix `v`.
+        // We know `v in baseLang`, which is `RegexLanguage(r_prime)`.
+        // By the outer IH (from the `requires` clause), this implies `Matches(r_prime, v)`.
+        assert Matches(r_prime, v);
+        // Since `v` must be concatenated with `w` (which is in V(n-1) and thus non-empty if n-1>0,
+        // or empty if n-1=0), we know `v` cannot be the whole string `s` unless `w` is empty.
+        // We also know `|v| > 0` if `baseLang` doesn't contain `[]`. Let's assume non-empty strings for now.
+
+        // Part 2: Analyze the suffix `w`.
+        // We know `w in V(baseLang, n-1)`. We can use our induction hypothesis on the smaller `n-1`.
+        LanguageImpliesMatches_V_Helper(r_prime, w, n-1);
+        // This ensures that `w` matches the Star expression.
+        assert Matches(Star(r_prime), w);
+
+        // Part 3: Combine them. Our goal is to prove `Matches(Star(r_prime), s)`.
+        // Let's use the `exists k...` clause of the `Matches(Star...)` definition.
+        // Our candidate for `k` is `|v|`. Let's check the conditions for `s = v+w`:
+        
+        // 1. `1 <= k < |s|` or `k = |s|`?
+        //    If `v` is not empty, `k=|v| >= 1`. If `w` is not empty, `k < |s|`.
+        //    If `w` is empty, `k=|s|`.
+        
+        // 2. `Matches(r_prime, s[..k])`?
+        //    `s[..k]` is `(v+w)[..|v|]`, which is `v`.
+        //    The condition is `Matches(r_prime, v)`, which we proved in Part 1.
+        
+        // 3. `Matches(Star(r_prime), s[k..])`?
+        //    `s[k..]` is `(v+w)[|v|..]`, which is `w`.
+        //    The condition is `Matches(Star(r_prime), w)`, which we proved in Part 2.
+        
+        // The existential is satisfied. The proof is complete without needing any complex helper lemmas.
+        if v == [] {
+            assert v+w == w;
+        }else if w == [] {
+            assert v+w == v;
+        }else{
+            assert 1 <= |v| < |s|;
+            assert Matches(r_prime, s[..|v|]);
+
+        }
+        
+        assert Matches(Star(r_prime), s);
+    }
+}
+lemma LanguageImpliesMatches<Alphabet(!new,==)>(r: RegExp<Alphabet>, s: seq<Alphabet>)
+    requires r.Star?
+    // This is the IH that gets passed to the helper.
+    requires forall s' :: s' in RegexLanguage(r.r) <==> Matches(r.r, s')
+    
+    // The premise for this specific lemma.
+    requires s in RegexLanguage(r)
+    ensures Matches(r, s)
+{
+    var r_prime := r.r;
+    var baseLang := RegexLanguage(r_prime);
+    
+    // The premise `s in RegexLanguage(r)` means `s in Kleene(baseLang)`.
+    // By definition of Kleene, there must exist an `n` such that `s in V(baseLang, n)`.
+    var n: nat :| s in V(baseLang, n);
+
+    // Now, call our powerful helper lemma with the witness `n`.
+    LanguageImpliesMatches_V_Helper(r_prime, s, n);
+
+    // The ensures clause of the helper directly proves our goal.
+}
+
+ghost function RegexLanguage<Alphabet(!new,==)>(r: RegExp<Alphabet>) : iset<seq<Alphabet>>
+{
+    match r
+    case Empty => iset{}
+    case Epsilon => iset{[]}
+    case Symbol(c) => iset{[c]}
+    case Union(r1, r2) => iset s | s in RegexLanguage(r1) || s in RegexLanguage(r2) :: s
+    case Concat(r1, r2) => iset s1, s2 | s1 in RegexLanguage(r1) && s2 in RegexLanguage(r2) :: s1 + s2
+    case Star(r) => Kleene(RegexLanguage(r))
+}
+
+
+ghost function RegexMatchLanguage<Alphabet(!new,==)>(r: RegExp<Alphabet>) : iset<seq<Alphabet>>
+{
+    iset s | Matches(r, s) :: s
+}
+
+lemma RegexMatchLanguageEpsilon<Alphabet(!new,==)>(r: RegExp<Alphabet>)
+    requires r.Epsilon?
+    ensures RegexMatchLanguage(r) == iset{[]}
+{
+    assert forall s | Matches(r, s) :: s == [];
+    assert forall x :: x in iset{[]} ==> x in RegexMatchLanguage(r) by {
+        forall x | x in iset{[]}
+        ensures x in RegexMatchLanguage(r)
+        {
+            if x == [] {
+                assert Matches(r, []);
+                assert x in RegexMatchLanguage(r);
+            } else {
+                assert false;
+            }
+        }
+    }
+}
+
+lemma RegexMatchLanguageSymbol<Alphabet(!new,==)>(r: RegExp<Alphabet>)
+    requires r.Symbol?
+    ensures RegexMatchLanguage(r) == iset{[r.c]}
+{
+    assert forall s | Matches(r, s) :: s == [r.c];
+    assert forall x :: x in iset{[r.c]} ==> x in RegexMatchLanguage(r) by {
+        forall x | x in iset{[r.c]}
+            ensures x in RegexMatchLanguage(r)
+        {
+            if x == [r.c] {
+                assert Matches(r, [r.c]);
+                assert x in RegexMatchLanguage(r);
+            } else {
+                assert false;
+            }
+        }
+    }
+}
+
+lemma RegexMatchLanguageUnion<Alphabet(!new,==)>(r1: RegExp<Alphabet>)
+    requires r1.Union?
+    ensures RegexMatchLanguage(r1.left) + RegexMatchLanguage(r1.right) == RegexMatchLanguage(r1)
+{
+    assert forall s | s in RegexMatchLanguage(r1) :: s in RegexMatchLanguage(r1.left) + RegexMatchLanguage(r1.right) by {
+        forall s | s in RegexMatchLanguage(r1)
+            ensures s in RegexMatchLanguage(r1.left) + RegexMatchLanguage(r1.right)
+        {
+            assert Matches(r1, s);
+        }
+    }
+    assert forall x :: x in RegexMatchLanguage(r1.left) + RegexMatchLanguage(r1.right) ==> x in RegexMatchLanguage(r1) by {
+        forall x | x in RegexMatchLanguage(r1.left) + RegexMatchLanguage(r1.right)
+            ensures x in RegexMatchLanguage(r1)
+        {
+            if x in RegexMatchLanguage(r1.left) {
+                assert Matches(r1.left, x);
+                assert Matches(r1, x);
+                assert x in RegexMatchLanguage(r1);
+            } else if x in RegexMatchLanguage(r1.right) {
+                assert Matches(r1.right, x); 
+                assert Matches(r1, x);
+                assert x in RegexMatchLanguage(r1);
+            } else {
+                assert false;
+            }
+        }
+    }
+}
+
+lemma RegexMatchLanguageConcat<Alphabet(!new,==)>(r1: RegExp<Alphabet>)
+    requires r1.Concat?
+    ensures RegexMatchLanguage(r1) == iset s1, s2 | s1 in RegexMatchLanguage(r1.left) && s2 in RegexMatchLanguage(r1.right) :: s1 + s2
+{
+    forall s | s in (iset s1, s2 | s1 in RegexMatchLanguage(r1.left) && s2 in RegexMatchLanguage(r1.right) :: s1 + s2)
+        ensures s in RegexMatchLanguage(r1)
+    {
+        var left, right :| s == left+right && left in RegexMatchLanguage(r1.left) && right in RegexMatchLanguage(r1.right);
+        assert 0 <= |left| <= |s|;
+        assert |left|+|right| == |s|;
+        assert Matches(r1.left, s[..|left|]);
+        assert Matches(r1.right, s[|left|..]);
+        assert Matches(r1, s);
+    }
+    
+    forall s | s in RegexMatchLanguage(r1)
+        ensures s in iset s1, s2 | s1 in RegexMatchLanguage(r1.left) && s2 in RegexMatchLanguage(r1.right) :: s1 + s2 
+    {
+        var k :| 0 <= k <= |s| && Matches(r1.left, s[..k]) && Matches(r1.right, s[k..]);
+        assert s[..k] in RegexMatchLanguage(r1.left);
+        assert s[k..] in RegexMatchLanguage(r1.right);
+        assert s == s[..k]+s[k..];
+    }
+
+}
+
+lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
+    ensures RegexMatchLanguage(r) == RegexLanguage(r)
+    decreases r
+{
+    if r.Empty? {
+        assert RegexMatchLanguage(r) == iset{};
+        assert RegexLanguage(r) == iset{};
+    } else if r.Epsilon? {
+        RegexMatchLanguageEpsilon(r);
+        assert RegexMatchLanguage(r) == iset{[]};
+        assert RegexLanguage(r) == iset{[]};
+    } else if r.Symbol? {
+        RegexMatchLanguageSymbol(r);
+        assert RegexMatchLanguage(r) == iset{[r.c]};
+        assert RegexLanguage(r) == iset{[r.c]};
+    } else if r.Union? {
+        RegexMatchLanguageUnion(r);
+        assert RegexMatchLanguage(r) == RegexMatchLanguage(r.left) + RegexMatchLanguage(r.right);
+        assert RegexLanguage(r) == RegexLanguage(r.left) + RegexLanguage(r.right);
+    } else if r.Concat? {
+        RegexMatchLanguageConcat(r);
+        assert RegexMatchLanguage(r) == iset s1, s2 | s1 in RegexMatchLanguage(r.left) && s2 in RegexMatchLanguage(r.right) :: s1 + s2;
+        assert RegexLanguage(r) == iset s1, s2 | s1 in RegexLanguage(r.left) && s2 in RegexLanguage(r.right) :: s1 + s2;
+    } else if r.Star? {
+            var r_prime := r.r;
+            // 1. Establish the Induction Hypothesis for the sub-expression.
+            // This is the most important step.
+            RegexMatchLanguageLemma(r_prime);
+            // We now have the crucial fact for our helpers:
+            // forall s' :: Matches(r_prime, s') <==> s' in RegexLanguage(r_prime)
+
+            // 2. Prove the equivalence for Star using our helpers.
+            // To prove the sets are equal, we show equivalence for any element `s`.
+            forall s: seq<Alphabet>
+                ensures Matches(Star(r_prime), s) <==> s in RegexLanguage(Star(r_prime))
+            {
+                // Direction 1: Matches ==> Language
+                if Matches(Star(r_prime), s) {
+                    // Call the helper lemma for this direction.
+                    // It is now provable because its `requires` clause (the IH) is met.
+                    MatchesImpliesLanguage(r, s);
+                    assert s in RegexLanguage(r);
+                }
+
+                // Direction 2: Language ==> Matches
+                if s in RegexLanguage(r) {
+                    // Call the helper lemma for this direction.
+                    LanguageImpliesMatches(r, s);
+                    assert Matches(r, s);
+                }
+            }
+            // Since we've shown forall s :: s in A <==> s in B, we can conclude A == B.
+            assert RegexMatchLanguage(r) == RegexLanguage(r);
+    }
+}
+
 
     lemma StateSequenceInDFA<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>)
         requires ValidDFA(d) && ValidString(d, s)
