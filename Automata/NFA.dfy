@@ -2,24 +2,24 @@ module NFAutomata {
   export reveals *
   datatype NFA<!State(==), !Alphabet(==)> = NFA(
     states: set<State>,
-    start_state: State,
-    accept_states: set<State>,
+    startState: State,
+    acceptStates: set<State>,
     alphabet: set<Alphabet>,
     transitions: map<(State, Alphabet), set<State>>,
-    epsilon_transitions: map<State, set<State>>
+    epsilonTransitions: map<State, set<State>>
   )
 
-  predicate ValidNFA<State, Alphabet>(nfa: NFA<State, Alphabet>)
+  predicate ValidNfa<State, Alphabet>(nfa: NFA<State, Alphabet>)
   {
-    nfa.start_state in nfa.states &&
-    nfa.accept_states <= nfa.states &&
+    nfa.startState in nfa.states &&
+    nfa.acceptStates <= nfa.states &&
     (forall s, a :: s in nfa.states && a in nfa.alphabet ==> (s,a) in nfa.transitions && nfa.transitions[(s, a)] <= nfa.states) &&
-    (forall s :: s in nfa.states && s in nfa.epsilon_transitions ==> nfa.epsilon_transitions[s] <= nfa.states)
+    (forall s :: s in nfa.states && s in nfa.epsilonTransitions ==> nfa.epsilonTransitions[s] <= nfa.states)
   }
 
 
   function Delta<State, Alphabet>(nfa: NFA<State, Alphabet>, state_set: set<State>, symbol: Alphabet): set<State>
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires state_set <= nfa.states
   {
     set q, r | 
@@ -30,7 +30,7 @@ module NFAutomata {
   }
 
   lemma DeltaResultIsSubsetOfStates<State, Alphabet>(nfa: NFA<State, Alphabet>, state_set: set<State>, symbol: Alphabet)
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires state_set <= nfa.states
     requires symbol in nfa.alphabet
     ensures Delta(nfa, state_set, symbol) <= nfa.states
@@ -40,7 +40,7 @@ module NFAutomata {
 
   // This is the extended transition function ("delta-hat") that processes a whole string.
   function DeltaHat<State, Alphabet>(nfa: NFA<State, Alphabet>, current_states: set<State>, input: seq<Alphabet>): set<State>
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires current_states <= nfa.states
     requires forall i | 0 <= i < |input| :: input[i] in nfa.alphabet // All input symbols are valid
     ensures DeltaHat(nfa, current_states, input) <= nfa.states
@@ -67,7 +67,7 @@ module NFAutomata {
   }
 
   function EpsilonClosure<State, Alphabet>(nfa: NFA<State, Alphabet>, current_set: set<State>): set<State>
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires current_set <= nfa.states // We must start with a valid set of states.
     ensures current_set <= EpsilonClosure(nfa, current_set)      // The closure must contain the original set.
     ensures EpsilonClosure(nfa, current_set) <= nfa.states       // The closure cannot contain states outside the NFA.
@@ -77,8 +77,8 @@ module NFAutomata {
     // Find all states reachable in one epsilon-step from the current_set.
     var one_step_away := set s, next | 
       s in current_set &&
-      s in nfa.epsilon_transitions &&
-      next in nfa.epsilon_transitions[s]
+      s in nfa.epsilonTransitions &&
+      next in nfa.epsilonTransitions[s]
       :: next;
 
 
@@ -96,9 +96,9 @@ module NFAutomata {
   }
 
   lemma EpsilonClosureWithNoEpsilons<State, Alphabet>(nfa: NFA<State, Alphabet>,  current_set: set<State>)
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires current_set <= nfa.states // We must start with a valid set of states.
-    requires nfa.epsilon_transitions == map[]
+    requires nfa.epsilonTransitions == map[]
     ensures EpsilonClosure(nfa, current_set) == current_set
   {
   }
@@ -108,30 +108,30 @@ module NFAutomata {
   }
 
   ghost predicate AcceptedWrong<State(!new,==), Alphabet(==)>(nfa: NFA<State, Alphabet>, input: seq<Alphabet>)
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires ValidString(nfa, input)
   {
-    exists states: seq<State> :: |states| == |input|+1 && states[0] == nfa.start_state && states[|input|] in nfa.accept_states && (forall i :: 0 <= i < |states| ==> states[i] in nfa.states) && (forall i :: 1 < i < |states| ==> states[i] in nfa.transitions[(states[i-1],input[i-1])])
+    exists states: seq<State> :: |states| == |input|+1 && states[0] == nfa.startState && states[|input|] in nfa.acceptStates && (forall i :: 0 <= i < |states| ==> states[i] in nfa.states) && (forall i :: 1 < i < |states| ==> states[i] in nfa.transitions[(states[i-1],input[i-1])])
   }
 
   predicate Accepts<State, Alphabet>(nfa: NFA<State, Alphabet>, input: seq<Alphabet>)
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     requires ValidString(nfa, input)
   {
     // 1. The initial set of active states is the epsilon closure of the start state.
-    var initial_states := EpsilonClosure(nfa, {nfa.start_state});
+    var initial_states := EpsilonClosure(nfa, {nfa.startState});
     
     // 2. Run the machine on the whole input string.
     var final_states := DeltaHat(nfa, initial_states, input);
     
     // 3. Check if any final state is an accept state.
-    final_states * nfa.accept_states != {}
+    final_states * nfa.acceptStates != {}
   }
 
   // A helper that defines what it means to go from a set of states S1 to a set of states S2
   // by processing one character `a`.
   predicate NfaTransitionStep<State, Alphabet>(nfa: NFA<State, Alphabet>, S1: set<State>, a: Alphabet, S2: set<State>)
-      requires ValidNFA(nfa)
+      requires ValidNfa(nfa)
       requires S1 <= nfa.states
       requires a in nfa.alphabet
       ensures NfaTransitionStep(nfa, S1, a, S2) ==> S2 <= nfa.states
@@ -142,18 +142,18 @@ module NFAutomata {
   // A predicate that checks if a sequence of *sets of states* is a valid trace
   // for the subset construction simulation of an NFA.
   predicate IsValidNfaTrace<State, Alphabet>(nfa: NFA<State, Alphabet>, w: seq<Alphabet>, trace: seq<set<State>>)
-      requires ValidNFA(nfa)
+      requires ValidNfa(nfa)
       requires ValidString(nfa, w)
   {
       |trace| == |w| + 1 &&
       // The trace must start with the epsilon closure of the start state.
-      trace[0] == EpsilonClosure(nfa, {nfa.start_state}) &&
+      trace[0] == EpsilonClosure(nfa, {nfa.startState}) &&
       // Each subsequent set in the trace must be the result of a transition from the previous set.
       forall i :: 0 <= i < |w| ==> trace[i] <= nfa.states && NfaTransitionStep(nfa, trace[i], w[i], trace[i+1])
   }
 
   lemma UniqueNfaTrace<State, Alphabet>(nfa: NFA, w: seq<Alphabet>, trace1: seq<set<State>>, trace2: seq<set<State>>)
-      requires ValidNFA(nfa) && ValidString(nfa, w)
+      requires ValidNfa(nfa) && ValidString(nfa, w)
       requires IsValidNfaTrace(nfa, w, trace1)
       requires IsValidNfaTrace(nfa, w, trace2)
       ensures trace1 == trace2
@@ -166,7 +166,7 @@ module NFAutomata {
 
   // Proves that the prefixes of length `k` of two valid traces are identical.
   lemma UniqueNfaTrace_PrefixesEqual<State, Alphabet>(nfa: NFA, w: seq<Alphabet>, trace1: seq<set<State>>, trace2: seq<set<State>>, k: nat)
-      requires ValidNFA(nfa) && ValidString(nfa, w)
+      requires ValidNfa(nfa) && ValidString(nfa, w)
       requires IsValidNfaTrace(nfa, w, trace1)
       requires IsValidNfaTrace(nfa, w, trace2)
       requires |trace1| == |trace2|
@@ -186,8 +186,8 @@ module NFAutomata {
           
           if i == 0 {
               // If we are proving for index 0, it's the base case of the trace.
-              assert trace1[0] == EpsilonClosure(nfa, {nfa.start_state});
-              assert trace2[0] == EpsilonClosure(nfa, {nfa.start_state});
+              assert trace1[0] == EpsilonClosure(nfa, {nfa.startState});
+              assert trace2[0] == EpsilonClosure(nfa, {nfa.startState});
               assert trace1[0] == trace2[0];
           } else {
               // We need to look at the previous element, i-1.
@@ -217,14 +217,14 @@ module NFAutomata {
   }
 
   ghost predicate Accepted<State(!new), Alphabet(!new)>(nfa: NFA<State, Alphabet>, w: seq<Alphabet>)
-      requires ValidNFA(nfa) && ValidString(nfa, w)
+      requires ValidNfa(nfa) && ValidString(nfa, w)
   {
       exists trace: seq<set<State>> :: 
           IsValidNfaTrace(nfa, w, trace) &&
-          trace[|w|] * nfa.accept_states != {}
+          trace[|w|] * nfa.acceptStates != {}
   }
   ghost function NFALanguage<State(!new), Alphabet(!new)>(nfa: NFA): iset<seq<Alphabet>> 
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
   {
     iset w: seq<Alphabet> | ValidString(nfa, w) && Accepted(nfa, w)
   }

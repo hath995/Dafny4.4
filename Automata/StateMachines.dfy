@@ -14,7 +14,7 @@ module StateMachines {
         forall s, a :: s in d.states && a in d.alphabet ==> d.transition(s, a) in d.states
     }
 
-    predicate ValidDFA<State(==), Alphabet(==)>(d: DFA<State, Alphabet>)
+    predicate ValidDfa<State(==), Alphabet(==)>(d: DFA<State, Alphabet>)
     
     {
         d.startState in d.states &&
@@ -550,7 +550,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
 
 
     lemma StateSequenceInDFA<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires |states| == |s| + 1
         requires states[0] in d.states
         requires forall i :: 1 <= i < |states| ==> states[i] == d.transition(states[i-1], s[i-1])
@@ -564,7 +564,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     lemma StateSequenceInDFABuildUp<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>, i: nat)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires |states| == |s| + 1
         requires states[0] in d.states
         requires forall j :: 1 <= j < |states| ==> states[j] == d.transition(states[j-1], s[j-1])
@@ -587,7 +587,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     lemma StateSequenceInDFAIterative<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>, i: nat)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires |states| == |s| + 1
         requires states[0] in d.states
         requires forall j :: 1 <= j < |states| ==> states[j] == d.transition(states[j-1], s[j-1])
@@ -642,13 +642,13 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     ghost predicate Accepted<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
     {
         exists states: seq<State> :: |states| == |s| + 1 && states[0] == d.startState && states[|s|] in d.acceptStates && (forall i :: 0 <= i < |states| ==> states[i] in d.states) && (forall i :: 1 <= i < |s| + 1 ==> states[i] == d.transition(states[i-1], s[i-1]))
     }
 
     lemma AcceptedRequiresAcceptState<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires |states| == |s| + 1
         requires states[0] == d.startState
         requires forall j :: j in states ==> j in d.states
@@ -678,7 +678,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
 
 
     lemma UniqueStateSequence<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states1: seq<State>, states2: seq<State>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires |states1| == |s| + 1 && |states2| == |s| + 1
         requires states1[0] == d.startState && states2[0] == d.startState
         requires forall j :: 0 <= j < |states1| ==> states1[j] in d.states
@@ -701,7 +701,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     lemma UniqueStateSequenceHelper<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states1: seq<State>, states2: seq<State>, i: nat)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires |states1| == |s| + 1 && |states2| == |s| + 1
         requires states1[0] == d.startState && states2[0] == d.startState
         requires forall j :: 0 <= j < |states1| ==> states1[j] in d.states
@@ -746,7 +746,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     predicate Accepts<State(!new, ==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>, i: nat)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         requires 0 <= i <= |s|
         requires |states| == i + 1
         requires |states| > 0 && states[0] == d.startState
@@ -764,7 +764,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     predicate Accept2<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         // ensures Accept2(d, s) == Accepted(d, s)
         decreases |s|
     {
@@ -776,7 +776,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     lemma Accept2EqualsAccepted<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         ensures Accept2(d, s) == Accepted(d, s)
     {
         Accept2ImpliesAccepted(d, s);
@@ -784,7 +784,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     lemma Accept2ImpliesAccepted<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         ensures Accept2(d, s) ==> Accepted(d, s)
         decreases |s|
     {
@@ -803,7 +803,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
                 // Inductive case: Accept2(d, s) means Accept2(nextDFA, s[1..]) is true
                 var nextState := d.transition(d.startState, s[0]);
                 var nextDFA := DFA(d.states, d.alphabet, d.transition, nextState, d.acceptStates);
-                assert ValidDFA(nextDFA);
+                assert ValidDfa(nextDFA);
                 assert ValidString(nextDFA, s[1..]);
                 assert Accept2(nextDFA, s[1..]);
                 
@@ -832,7 +832,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     lemma AcceptedImpliesAccept2<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, s)
+        requires ValidDfa(d) && ValidString(d, s)
         ensures Accepted(d, s) ==> Accept2(d, s)
         decreases |s|
     {
@@ -871,7 +871,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
                 
                 // This shows Accepted(nextDFA, s[1..])
                 var nextDFA := DFA(d.states, d.alphabet, d.transition, nextState, d.acceptStates);
-                assert ValidDFA(nextDFA);
+                assert ValidDfa(nextDFA);
                 assert ValidString(nextDFA, s[1..]);
                 assert Accepted(nextDFA, s[1..]);
                 
@@ -886,7 +886,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
 
 
     // lemma AcceptsEqual<State(==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>, i: nat)
-    //     requires ValidDFA(d) && ValidString(d, s)
+    //     requires ValidDfa(d) && ValidString(d, s)
     //     ensures Accepts(d, s, [d.startState], 0) == Accept2(d, s)
     // {
     //     if |s| == 0 {
@@ -906,36 +906,30 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
             0,
             {1}
         );
-        assert ValidDFA(d);
+        assert ValidDfa(d);
 
         assert Accepts(d, "a", [0], 0);
         assert !Accepts(d, "b", [0], 0);
     }
 
     ghost function Language<State(!new), Alphabet(!new)>(d: DFA<State, Alphabet>): iset<seq<Alphabet>>
-        requires ValidDFA(d)
+        requires ValidDfa(d)
     {
         iset w: seq<Alphabet> | ValidString(d, w) && Accepted(d, w)
-    }
-
-    ghost predicate IsRegularLanguageWithDFA<State(!new), Alphabet(!new)>(L: iset<seq<Alphabet>>, d: DFA<State, Alphabet>)
-        requires ValidDFA(d)
-    {
-        L == Language(d)
     }
 
     // A language L is regular if it can be recognized by some DFA
     ghost predicate IsRegularLanguage<State(!new), Alphabet(!new)>(L: iset<seq<Alphabet>>, alphabet: set<Alphabet>)
     {
         exists dfa: DFA<State, Alphabet> :: 
-            ValidDFA(dfa) && 
+            ValidDfa(dfa) && 
             dfa.alphabet == alphabet &&
             L == Language(dfa)
     }
 
     // Construction of a DFA that recognizes the union of two languages
-    ghost function UnionDFA<State1(!new), State2(!new), Alphabet(!new)>(d1: DFA<State1, Alphabet>, d2: DFA<State2, Alphabet>): DFA<(State1, State2), Alphabet>
-        requires ValidDFA(d1) && ValidDFA(d2)
+    ghost function UnionDfa<State1(!new), State2(!new), Alphabet(!new)>(d1: DFA<State1, Alphabet>, d2: DFA<State2, Alphabet>): DFA<(State1, State2), Alphabet>
+        requires ValidDfa(d1) && ValidDfa(d2)
         requires d1.alphabet == d2.alphabet
     {
         DFA(
@@ -956,13 +950,13 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
         )
     }
 
-    // Lemma proving that the UnionDFA is valid when the input DFAs are valid
-    lemma UnionDFAValid<State1(!new), State2(!new), Alphabet(!new)>(d1: DFA<State1, Alphabet>, d2: DFA<State2, Alphabet>)
-        requires ValidDFA(d1) && ValidDFA(d2)
+    // Lemma proving that the UnionDfa is valid when the input DFAs are valid
+    lemma UnionDfaValid<State1(!new), State2(!new), Alphabet(!new)>(d1: DFA<State1, Alphabet>, d2: DFA<State2, Alphabet>)
+        requires ValidDfa(d1) && ValidDfa(d2)
         requires d1.alphabet == d2.alphabet
-        ensures ValidDFA(UnionDFA(d1, d2))
+        ensures ValidDfa(UnionDfa(d1, d2))
     {
-        var unionDFA := UnionDFA(d1, d2);
+        var unionDFA := UnionDfa(d1, d2);
         
         // Prove start state is in states
         assert unionDFA.startState == (d1.startState, d2.startState);
@@ -986,19 +980,19 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
         ensures IsRegularLanguage<(nat, nat), Alphabet>(L1 + L2, alphabet)
     {
         // Extract witness DFAs for L1 and L2
-        var dfa1: DFA<nat, Alphabet> :| ValidDFA(dfa1) && dfa1.alphabet == alphabet && L1 == Language(dfa1);
-        var dfa2: DFA<nat, Alphabet> :| ValidDFA(dfa2) && dfa2.alphabet == alphabet && L2 == Language(dfa2);
+        var dfa1: DFA<nat, Alphabet> :| ValidDfa(dfa1) && dfa1.alphabet == alphabet && L1 == Language(dfa1);
+        var dfa2: DFA<nat, Alphabet> :| ValidDfa(dfa2) && dfa2.alphabet == alphabet && L2 == Language(dfa2);
         
         // Construct the union DFA
-        var unionDFA := UnionDFA(dfa1, dfa2);
+        var unionDFA := UnionDfa(dfa1, dfa2);
         
         // Prove the union DFA is valid
-        UnionDFAValid(dfa1, dfa2);
-        assert ValidDFA(unionDFA);
+        UnionDfaValid(dfa1, dfa2);
+        assert ValidDfa(unionDFA);
         assert unionDFA.alphabet == alphabet;
         
         // Prove that the union DFA recognizes exactly L1 ∪ L2
-        UnionDFACorrectness(dfa1, dfa2, L1, L2);
+        UnionDfaCorrectness(dfa1, dfa2, L1, L2);
         assert L1 + L2 == Language(unionDFA);
         
         // Therefore L1 ∪ L2 is regular
@@ -1006,18 +1000,18 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     // Helper lemma: The union DFA recognizes exactly the union of the languages
-    lemma UnionDFACorrectness<State1(!new), State2(!new), Alphabet(!new)>(
+    lemma UnionDfaCorrectness<State1(!new), State2(!new), Alphabet(!new)>(
         dfa1: DFA<State1, Alphabet>, 
         dfa2: DFA<State2, Alphabet>, 
         L1: iset<seq<Alphabet>>, 
         L2: iset<seq<Alphabet>>)
-        requires ValidDFA(dfa1) && ValidDFA(dfa2)
+        requires ValidDfa(dfa1) && ValidDfa(dfa2)
         requires dfa1.alphabet == dfa2.alphabet
         requires L1 == Language(dfa1)
         requires L2 == Language(dfa2)
-        ensures L1 + L2 == Language(UnionDFA(dfa1, dfa2))
+        ensures L1 + L2 == Language(UnionDfa(dfa1, dfa2))
     {
-        var unionDFA := UnionDFA(dfa1, dfa2);
+        var unionDFA := UnionDfa(dfa1, dfa2);
         
         // Prove both directions of the equality
         forall w: seq<Alphabet> 
@@ -1026,13 +1020,13 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
             if ValidString(unionDFA, w) {
                 // If w is in L1 ∪ L2, then it's accepted by unionDFA
                 if w in L1 + L2 {
-                    UnionDFAAcceptsUnion(dfa1, dfa2, w);
+                    UnionDfaAcceptsUnion(dfa1, dfa2, w);
                     assert w in Language(unionDFA);
                 }
                 
                 // If w is accepted by unionDFA, then it's in L1 ∪ L2
                 if w in Language(unionDFA) {
-                    UnionDFAOnlyAcceptsUnion(dfa1, dfa2, w);
+                    UnionDfaOnlyAcceptsUnion(dfa1, dfa2, w);
                     assert w in L1 + L2;
                 }
             }
@@ -1041,7 +1035,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
 
     // Function to compute the state sequence for any string in a DFA
     ghost function ComputeStateSequence<State(!new), Alphabet(!new)>(d: DFA<State, Alphabet>, w: seq<Alphabet>): seq<State>
-        requires ValidDFA(d) && ValidString(d, w)
+        requires ValidDfa(d) && ValidString(d, w)
         ensures |ComputeStateSequence(d, w)| == |w| + 1
         ensures ComputeStateSequence(d, w)[0] == d.startState
         ensures forall i :: 0 <= i < |ComputeStateSequence(d, w)| ==> ComputeStateSequence(d, w)[i] in d.states
@@ -1059,7 +1053,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
 
     // Lemma: The computed state sequence has all states in the DFA
     lemma ComputeStateSequenceValid<State(!new), Alphabet(!new)>(d: DFA<State, Alphabet>, w: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, w)
+        requires ValidDfa(d) && ValidString(d, w)
         ensures var states := ComputeStateSequence(d, w);
                 |states| == |w| + 1 &&
                 states[0] == d.startState &&
@@ -1072,7 +1066,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
 
     // Lemma: If a string is accepted, then the computed sequence ends in an accept state
     lemma ComputeStateSequenceAccepting<State(!new), Alphabet(!new)>(d: DFA<State, Alphabet>, w: seq<Alphabet>)
-        requires ValidDFA(d) && ValidString(d, w)
+        requires ValidDfa(d) && ValidString(d, w)
         requires Accepted(d, w)
         ensures ComputeStateSequence(d, w)[|w|] in d.acceptStates
     {
@@ -1090,7 +1084,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     // Helper lemma: Union DFA simulates both component DFAs in parallel
-    lemma UnionDFASimulatesParallel<State1(!new), State2(!new), Alphabet(!new)>(
+    lemma UnionDfaSimulatesParallel<State1(!new), State2(!new), Alphabet(!new)>(
         dfa1: DFA<State1, Alphabet>, 
         dfa2: DFA<State2, Alphabet>, 
         w: seq<Alphabet>,
@@ -1098,7 +1092,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
         states1: seq<State1>,
         states2: seq<State2>,
         i: nat)
-        requires ValidDFA(dfa1) && ValidDFA(dfa2)
+        requires ValidDfa(dfa1) && ValidDfa(dfa2)
         requires dfa1.alphabet == dfa2.alphabet
         requires ValidString(dfa1, w) && ValidString(dfa2, w)
         requires |unionStates| == |w| + 1
@@ -1123,7 +1117,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
             assert unionStates[0] == (states1[0], states2[0]);
         } else {
             // Inductive case: assume parallel simulation holds up to i-1, prove for i
-            UnionDFASimulatesParallel(dfa1, dfa2, w, unionStates, states1, states2, i - 1);
+            UnionDfaSimulatesParallel(dfa1, dfa2, w, unionStates, states1, states2, i - 1);
             
             // Now prove that the i-th transition is correct
             assert unionStates[i] == (states1[i], states2[i]);
@@ -1137,17 +1131,17 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     // Helper lemma: If dfa1 accepts w, then union DFA accepts w
-    lemma UnionDFAAcceptsFromDFA1<State1(!new), State2(!new), Alphabet(!new)>(
+    lemma UnionDfaAcceptsFromDFA1<State1(!new), State2(!new), Alphabet(!new)>(
         dfa1: DFA<State1, Alphabet>, 
         dfa2: DFA<State2, Alphabet>, 
         w: seq<Alphabet>)
-        requires ValidDFA(dfa1) && ValidDFA(dfa2)
+        requires ValidDfa(dfa1) && ValidDfa(dfa2)
         requires dfa1.alphabet == dfa2.alphabet
         requires ValidString(dfa1, w) && ValidString(dfa2, w)
         requires Accepted(dfa1, w)
-        ensures Accepted(UnionDFA(dfa1, dfa2), w)
+        ensures Accepted(UnionDfa(dfa1, dfa2), w)
     {
-        var unionDFA := UnionDFA(dfa1, dfa2);
+        var unionDFA := UnionDfa(dfa1, dfa2);
         
         // Compute the state sequences for both DFAs
         var states1 := ComputeStateSequence(dfa1, w);
@@ -1174,17 +1168,17 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     // Helper lemma: If dfa2 accepts w, then union DFA accepts w
-    lemma UnionDFAAcceptsFromDFA2<State1(!new), State2(!new), Alphabet(!new)>(
+    lemma UnionDfaAcceptsFromDFA2<State1(!new), State2(!new), Alphabet(!new)>(
         dfa1: DFA<State1, Alphabet>, 
         dfa2: DFA<State2, Alphabet>, 
         w: seq<Alphabet>)
-        requires ValidDFA(dfa1) && ValidDFA(dfa2)
+        requires ValidDfa(dfa1) && ValidDfa(dfa2)
         requires dfa1.alphabet == dfa2.alphabet
         requires ValidString(dfa1, w) && ValidString(dfa2, w)
         requires Accepted(dfa2, w)
-        ensures Accepted(UnionDFA(dfa1, dfa2), w)
+        ensures Accepted(UnionDfa(dfa1, dfa2), w)
     {
-        var unionDFA := UnionDFA(dfa1, dfa2);
+        var unionDFA := UnionDfa(dfa1, dfa2);
         
         // Compute the state sequences for both DFAs
         var states1 := ComputeStateSequence(dfa1, w);
@@ -1211,43 +1205,43 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     // Helper lemma: If a string is in L1 ∪ L2, then it's accepted by the union DFA
-    lemma UnionDFAAcceptsUnion<State1(!new), State2(!new), Alphabet(!new)>(
+    lemma UnionDfaAcceptsUnion<State1(!new), State2(!new), Alphabet(!new)>(
         dfa1: DFA<State1, Alphabet>, 
         dfa2: DFA<State2, Alphabet>, 
         w: seq<Alphabet>)
-        requires ValidDFA(dfa1) && ValidDFA(dfa2)
+        requires ValidDfa(dfa1) && ValidDfa(dfa2)
         requires dfa1.alphabet == dfa2.alphabet
         requires ValidString(dfa1, w) && ValidString(dfa2, w)
         requires Accepted(dfa1, w) || Accepted(dfa2, w)
-        ensures Accepted(UnionDFA(dfa1, dfa2), w)
+        ensures Accepted(UnionDfa(dfa1, dfa2), w)
     {
-        var unionDFA := UnionDFA(dfa1, dfa2);
+        var unionDFA := UnionDfa(dfa1, dfa2);
         
         // Case analysis: either dfa1 accepts w, or dfa2 accepts w (or both)
         if Accepted(dfa1, w) {
             // Case 1: dfa1 accepts w
-            UnionDFAAcceptsFromDFA1(dfa1, dfa2, w);
+            UnionDfaAcceptsFromDFA1(dfa1, dfa2, w);
             assert Accepted(unionDFA, w);
         } else {
             // Case 2: dfa2 accepts w (since we know dfa1 || dfa2 accepts)
             assert Accepted(dfa2, w);
-            UnionDFAAcceptsFromDFA2(dfa1, dfa2, w);
+            UnionDfaAcceptsFromDFA2(dfa1, dfa2, w);
             assert Accepted(unionDFA, w);
         }
     }
 
     // Helper lemma: If a string is accepted by the union DFA, then it's in L1 ∪ L2  
-    lemma UnionDFAOnlyAcceptsUnion<State1(!new), State2(!new), Alphabet(!new)>(
+    lemma UnionDfaOnlyAcceptsUnion<State1(!new), State2(!new), Alphabet(!new)>(
         dfa1: DFA<State1, Alphabet>, 
         dfa2: DFA<State2, Alphabet>, 
         w: seq<Alphabet>)
-        requires ValidDFA(dfa1) && ValidDFA(dfa2)
+        requires ValidDfa(dfa1) && ValidDfa(dfa2)
         requires dfa1.alphabet == dfa2.alphabet
-        requires ValidString(UnionDFA(dfa1, dfa2), w)
-        requires Accepted(UnionDFA(dfa1, dfa2), w)
+        requires ValidString(UnionDfa(dfa1, dfa2), w)
+        requires Accepted(UnionDfa(dfa1, dfa2), w)
         ensures Accepted(dfa1, w) || Accepted(dfa2, w)
     {
-        var unionDFA := UnionDFA(dfa1, dfa2);
+        var unionDFA := UnionDfa(dfa1, dfa2);
         
         // Since the union DFA accepts w, there exists a witness state sequence
         var unionStates: seq<(State1, State2)> :| 

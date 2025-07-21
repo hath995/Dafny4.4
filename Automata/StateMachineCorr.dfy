@@ -9,15 +9,17 @@ module SMCorr {
 
     ghost predicate MachinesEquivalent<States(!new), StateSets(!new), Alphabet(!new)>(dfa: DFA<StateSets, Alphabet>, nfa: NFA<States, Alphabet>)
         requires dfa.alphabet == nfa.alphabet
-        requires ValidDFA(dfa)
-        requires ValidNFA(nfa)
+        requires ValidDfa(dfa)
+        requires ValidNfa(nfa)
     {
         Language(dfa) == NFALanguage(nfa)
     }
 
     function DfaToNfa<State(!new, ==), Alphabet(!new, ==)>(dfa: DFA<State, Alphabet>): NFA<State, Alphabet>
-        requires ValidDFA(dfa)
-        ensures ValidNFA(DfaToNfa(dfa))
+        requires ValidDfa(dfa)
+        ensures ValidNfa(DfaToNfa(dfa))
+        ensures forall key :: key in DfaToNfa(dfa).transitions.Keys ==> |DfaToNfa(dfa).transitions[key]| == 1
+        ensures DfaToNfa(dfa).transitions == map pair: (State, Alphabet) | pair in Cross(dfa.states, dfa.alphabet) :: {dfa.transition(pair.0, pair.1)} // Each transition maps to a single state
     {
         var transitions := map pair: (State, Alphabet) | pair in Cross(dfa.states, dfa.alphabet) :: {dfa.transition(pair.0, pair.1)};
 
@@ -25,7 +27,7 @@ module SMCorr {
     }
 
     function NfaDfaDelta<State(!new, ==), Alphabet(!new, ==)>(nfa: NFA, R: set<State>, a: Alphabet): set<State>
-        requires ValidNFA(nfa)
+        requires ValidNfa(nfa)
         ensures NfaDfaDelta(nfa, R, a) in set state | state <= nfa.states :: state
     {
         assert {} <= nfa.states;
@@ -35,42 +37,42 @@ module SMCorr {
     }
 
     function NfaToDfa<State(!new), Alphabet(!new)>(nfa: NFA): DFA<set<State>, Alphabet> 
-        requires ValidNFA(nfa)
-        ensures ValidDFA(NfaToDfa(nfa))
+        requires ValidNfa(nfa)
+        ensures ValidDfa(NfaToDfa(nfa))
     {
         var result:= DFA(
             set state | state <= nfa.states :: state,
             nfa.alphabet, 
             (state: set<State>, a: Alphabet) => NfaDfaDelta(nfa, state, a),
-            EpsilonClosure(nfa, {nfa.start_state}),
-            set S | S <= nfa.states && S * nfa.accept_states != {}
+            EpsilonClosure(nfa, {nfa.startState}),
+            set S | S <= nfa.states && S * nfa.acceptStates != {}
             // set accept_state, state | state <= nfa.states && accept_state in nfa.accept_states && accept_state in state :: state
         );
-        assert {nfa.start_state} <= nfa.states;
+        assert {nfa.startState} <= nfa.states;
         result
     }
 
 
 
 lemma NfaExtendedDeltaComputesTrace<State, Alphabet>(nfa: NFA<State, Alphabet>, w: seq<Alphabet>)
-    requires ValidNFA(nfa) && NFAutomata.ValidString(nfa, w)
+    requires ValidNfa(nfa) && NFAutomata.ValidString(nfa, w)
     ensures exists trace: seq<set<State>> :: 
         IsValidNfaTrace(nfa, w, trace) && 
-        NfaExtendedDelta(nfa, {nfa.start_state}, w) == trace[|w|]
+        NfaExtendedDelta(nfa, {nfa.startState}, w) == trace[|w|]
     decreases |w|
 {
     if |w| == 0 {
         // Base case: The trace is just one set, the initial epsilon closure.
-        var trace0 := [EpsilonClosure(nfa, {nfa.start_state})];
+        var trace0 := [EpsilonClosure(nfa, {nfa.startState})];
         assert IsValidNfaTrace(nfa, [], trace0);
-        assert NfaExtendedDelta(nfa, {nfa.start_state}, []) == trace0[0];
+        assert NfaExtendedDelta(nfa, {nfa.startState}, []) == trace0[0];
     } else {
         // Inductive step:
         var prefix := w[..|w|-1];
         var last_char := w[|w|-1];
         // By the IH, there exists a valid trace for the prefix.
         var prefix_trace: seq<set<State>> :| IsValidNfaTrace(nfa, prefix, prefix_trace) &&
-                                             NfaExtendedDelta(nfa, {nfa.start_state}, prefix) == prefix_trace[|prefix|];
+                                             NfaExtendedDelta(nfa, {nfa.startState}, prefix) == prefix_trace[|prefix|];
         
         // We construct the full trace by adding one more step.
         var last_state_set := prefix_trace[|prefix|];
@@ -82,7 +84,7 @@ lemma NfaExtendedDeltaComputesTrace<State, Alphabet>(nfa: NFA<State, Alphabet>, 
         
         // Prove that NfaExtendedDelta computes the last element of this trace.
         // Unfold the definition of NfaExtendedDelta for `w`.
-        var nfa_final_states := NfaExtendedDelta(nfa, {nfa.start_state}, w);
+        var nfa_final_states := NfaExtendedDelta(nfa, {nfa.startState}, w);
         // Its recursive call matches what we have from the IH.
         assert nfa_final_states == next_state_set;
         assert nfa_final_states == full_trace[|w|];
@@ -91,22 +93,22 @@ lemma NfaExtendedDeltaComputesTrace<State, Alphabet>(nfa: NFA<State, Alphabet>, 
 
 // Now, we prove the lemma you were trying to write.
 lemma NfaExtendedDeltaAccepting<State(!new), Alphabet(!new)>(nfa: NFA<State, Alphabet>, w: seq<Alphabet>)
-    requires ValidNFA(nfa) && NFAutomata.ValidString(nfa, w)
+    requires ValidNfa(nfa) && NFAutomata.ValidString(nfa, w)
     requires NFAutomata.Accepted(nfa, w) // The premise: the NFA accepts the word.
-    ensures var final_states := NfaExtendedDelta(nfa, {nfa.start_state}, w);
-            final_states * nfa.accept_states != {}
+    ensures var final_states := NfaExtendedDelta(nfa, {nfa.startState}, w);
+            final_states * nfa.acceptStates != {}
 {
     // 1. From `requires Accepted(nfa, w)`, we know there exists an accepting trace.
     var accepting_trace: seq<set<State>> :| 
         IsValidNfaTrace(nfa, w, accepting_trace) &&
-        accepting_trace[|w|] * nfa.accept_states != {};
+        accepting_trace[|w|] * nfa.acceptStates != {};
 
     // 2. From our `NfaExtendedDeltaComputesTrace` lemma, we know there also exists
     //    a trace computed by our function.
     NfaExtendedDeltaComputesTrace(nfa, w);
     var computed_trace: seq<set<State>> :|
         IsValidNfaTrace(nfa, w, computed_trace) &&
-        NfaExtendedDelta(nfa, {nfa.start_state}, w) == computed_trace[|w|];
+        NfaExtendedDelta(nfa, {nfa.startState}, w) == computed_trace[|w|];
         
     // 3. We need to prove that any two valid traces for the same NFA and word are identical.
     //    This is because the subset construction is deterministic.
@@ -117,14 +119,14 @@ lemma NfaExtendedDeltaAccepting<State(!new), Alphabet(!new)>(nfa: NFA<State, Alp
     assert accepting_trace[|w|] == computed_trace[|w|];
     
     // 5. Therefore, the property of the accepting trace must also hold for the computed trace's last element.
-    var final_states := NfaExtendedDelta(nfa, {nfa.start_state}, w);
+    var final_states := NfaExtendedDelta(nfa, {nfa.startState}, w);
     assert final_states == accepting_trace[|w|];
-    assert final_states * nfa.accept_states != {}; // This is our goal.
+    assert final_states * nfa.acceptStates != {}; // This is our goal.
 }
 
 
 lemma NFA_DFA_Equivalent<State(!new), Alphabet(!new)>(nfa: NFA<State, Alphabet>)
-    requires ValidNFA(nfa)
+    requires ValidNfa(nfa)
     ensures Language(NfaToDfa(nfa)) == NFALanguage(nfa)
 {
     var dfa := NfaToDfa(nfa);
@@ -136,9 +138,9 @@ lemma NFA_DFA_Equivalent<State(!new), Alphabet(!new)>(nfa: NFA<State, Alphabet>)
         
         var dfa_path := ComputeStateSequence(dfa, word);
         var dfa_final_state := dfa_path[|word|];
-        var nfa_final_states := NfaExtendedDelta(nfa, {nfa.start_state}, word);
+        var nfa_final_states := NfaExtendedDelta(nfa, {nfa.startState}, word);
         NfaExtendedDeltaAccepting(nfa, word);
-        assert nfa_final_states * nfa.accept_states != {};
+        assert nfa_final_states * nfa.acceptStates != {};
         assert dfa_final_state == nfa_final_states;
         assert StateMachines.Accepted(dfa, word);
 
@@ -153,14 +155,14 @@ lemma NFA_DFA_Equivalent<State(!new), Alphabet(!new)>(nfa: NFA<State, Alphabet>)
         assert IsValidNfaTrace(nfa, word, dfa_path);
         var dfa_final_state := dfa_path[|word|];
         assert dfa_final_state in dfa.acceptStates;
-        assert dfa_final_state * nfa.accept_states != {};
+        assert dfa_final_state * nfa.acceptStates != {};
     }
     // Set equality follows from element-wise equivalence.
 }
 
     // For the NFA: computes the set of all possible final states after reading a whole word.
 ghost function NfaExtendedDelta<State, Alphabet>(nfa: NFA<State, Alphabet>, S: set<State>, w: seq<Alphabet>) : set<State>
-    requires ValidNFA(nfa) && S <= nfa.states && NFAutomata.ValidString(nfa, w)
+    requires ValidNfa(nfa) && S <= nfa.states && NFAutomata.ValidString(nfa, w)
     decreases |w|
 {
     if |w| == 0 then EpsilonClosure(nfa, S)
@@ -171,13 +173,13 @@ ghost function NfaExtendedDelta<State, Alphabet>(nfa: NFA<State, Alphabet>, S: s
 }
 
 lemma DfaPathCorrespondsToNfaPath<State(!new), Alphabet(!new)>(nfa: NFA<State, Alphabet>, w: seq<Alphabet>)
-    requires ValidNFA(nfa) && NFAutomata.ValidString(nfa, w)
+    requires ValidNfa(nfa) && NFAutomata.ValidString(nfa, w)
     ensures var dfa := NfaToDfa(nfa);
             var dfa_path := ComputeStateSequence(dfa, w);
             // The final state of the DFA path...
             dfa_path[|w|] == 
             // ...is equal to the set of all possible NFA states.
-            NfaExtendedDelta(nfa, {nfa.start_state}, w)
+            NfaExtendedDelta(nfa, {nfa.startState}, w)
     decreases |w|
 {
     var dfa: DFA<set<State>, Alphabet> := NfaToDfa(nfa);
@@ -191,8 +193,8 @@ lemma DfaPathCorrespondsToNfaPath<State(!new), Alphabet(!new)>(nfa: NFA<State, A
         assert dfa_final_state == dfa.startState;
 
         // The final set of NFA states is the EpsilonClosure of its start state.
-        var nfa_final_states := NfaExtendedDelta(nfa, {nfa.start_state}, []);
-        assert nfa_final_states == EpsilonClosure(nfa, {nfa.start_state});
+        var nfa_final_states := NfaExtendedDelta(nfa, {nfa.startState}, []);
+        assert nfa_final_states == EpsilonClosure(nfa, {nfa.startState});
 
         // By our corrected NfaToDfa definition, these are equal.
         assert dfa.startState == nfa_final_states;
@@ -207,7 +209,7 @@ lemma DfaPathCorrespondsToNfaPath<State(!new), Alphabet(!new)>(nfa: NFA<State, A
         
         var dfa_prefix_path := ComputeStateSequence(dfa, prefix);
         var dfa_state_after_prefix := dfa_prefix_path[|prefix|];
-        var nfa_states_after_prefix := NfaExtendedDelta(nfa, {nfa.start_state}, prefix);
+        var nfa_states_after_prefix := NfaExtendedDelta(nfa, {nfa.startState}, prefix);
         // By the IH, these are equal.
         assert dfa_state_after_prefix == nfa_states_after_prefix;
 
@@ -229,17 +231,17 @@ lemma DfaPathCorrespondsToNfaPath<State(!new), Alphabet(!new)>(nfa: NFA<State, A
         // The final state of the DFA path is equal to the final set of NFA states.
         // This is not quite the ensures clause. We need to relate nfa_final_states
         // to NfaExtendedDelta(nfa, {nfa.start_state}, w).
-        assert nfa_final_states == NfaExtendedDelta(nfa, {nfa.start_state}, w);
-        assert dfa_final_state == NfaExtendedDelta(nfa, {nfa.start_state}, w);
+        assert nfa_final_states == NfaExtendedDelta(nfa, {nfa.startState}, w);
+        assert dfa_final_state == NfaExtendedDelta(nfa, {nfa.startState}, w);
     }
 }
 
     lemma accept_States<State(!new), Alphabet(!new)>(nfa: NFA)
-        requires ValidNFA(nfa)
-        ensures (set S | S <= nfa.states && S * nfa.accept_states != {}) == set accept_state, state | state <= nfa.states && accept_state in nfa.accept_states && accept_state in state :: state
+        requires ValidNfa(nfa)
+        ensures (set S | S <= nfa.states && S * nfa.acceptStates != {}) == set accept_state, state | state <= nfa.states && accept_state in nfa.acceptStates && accept_state in state :: state
     {
-       var ss := set S | S <= nfa.states && S * nfa.accept_states != {};
-       var ys := set accept_state, state | state <= nfa.states && accept_state in nfa.accept_states && accept_state in state :: state;
+       var ss := set S | S <= nfa.states && S * nfa.acceptStates != {};
+       var ys := set accept_state, state | state <= nfa.states && accept_state in nfa.acceptStates && accept_state in state :: state;
        forall x | x in ss
           ensures x in ys;
        {}
@@ -248,9 +250,9 @@ lemma DfaPathCorrespondsToNfaPath<State(!new), Alphabet(!new)>(nfa: NFA<State, A
           ensures x in ss;
        {
         assert x <= nfa.states;
-        var ac :| ac in nfa.accept_states && ac in x; 
-        assert ac in x * nfa.accept_states;
-        assert x * nfa.accept_states != {};
+        var ac :| ac in nfa.acceptStates && ac in x; 
+        assert ac in x * nfa.acceptStates;
+        assert x * nfa.acceptStates != {};
        }
     }
 
