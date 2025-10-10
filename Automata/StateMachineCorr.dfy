@@ -26,6 +26,165 @@ module SMCorr {
         NFA(dfa.states, dfa.startState, dfa.acceptStates, dfa.alphabet, transitions, map[])
     }
 
+    lemma DfaNfaDeltaHasSingleResult<State(!new, ==), Alphabet(!new, ==)>(dfa: DFA<State, Alphabet>, R: set<State>, a: Alphabet)
+        requires ValidDfa(dfa)
+        requires R <= dfa.states
+        requires a in dfa.alphabet
+
+        requires |R| == 1
+        ensures |Delta(DfaToNfa(dfa), R, a)| == 1
+        ensures EpsilonClosure(DfaToNfa(dfa), Delta(DfaToNfa(dfa), R, a)) == Delta(DfaToNfa(dfa), R, a)
+    {
+        assert R != {};
+        var s :| s in R;
+        assert |R-{s}| == 0;
+        assert s in dfa.states;
+        assert (s, a) in DfaToNfa(dfa).transitions;
+        assert Delta(DfaToNfa(dfa), R, a) == {dfa.transition(s, a)};
+        assert |Delta(DfaToNfa(dfa), R, a)| == 1;
+        EpsilonClosureWithNoEpsilons(DfaToNfa(dfa), Delta(DfaToNfa(dfa), R, a));
+    }
+
+    lemma AreTransitionsOfDfaToNfa<State(!new, ==), Alphabet(!new, ==)>(dfa: DFA<State, Alphabet>, word: seq<Alphabet>, dfa_path: seq<State>, i: int)
+        requires ValidDfa(dfa)
+        requires StateMachines.ValidString(dfa, word)
+        requires dfa_path == ComputeStateSequence(dfa, word)
+        requires 0 <= i < |word|
+        ensures {dfa_path[i+1]} == Delta(DfaToNfa(dfa), {dfa_path[i]}, word[i])
+    {
+        DfaNfaDeltaHasSingleResult(dfa, {dfa_path[i]}, word[i]);
+    }
+
+    lemma NfaSequenceOfDfa<State(!new, ==), Alphabet(!new, ==)>(dfa: DFA<State, Alphabet>, word: seq<Alphabet>, nfa_path: seq<set<State>>, i: int)
+        requires ValidDfa(dfa)
+        requires StateMachines.ValidString(dfa, word)
+        requires NFAutomata.Accepted(DfaToNfa(dfa), word)
+        requires IsValidNfaTrace(DfaToNfa(dfa), word, nfa_path)
+        requires NfaExtendedDelta(DfaToNfa(dfa), {dfa.startState}, word) == nfa_path[|word|]
+        requires 0 <= i <= |word|
+        ensures |nfa_path[i]| == 1
+        // ensures seq(|word|+1, i requires 0 <= i < |word|+1 => {ComputeStateSequence(dfa, word)[i]}) == ComputeStateSequence(DfaToNfa(dfa), word)
+    {
+        if i == 0 {
+            assert nfa_path[0] == EpsilonClosure(DfaToNfa(dfa), {dfa.startState});
+            assert dfa.startState in nfa_path[0];
+            assert |nfa_path[0]| == 1;
+        } else {
+           NfaSequenceOfDfa(dfa, word, nfa_path, i-1); 
+           DfaNfaDeltaHasSingleResult(dfa, nfa_path[i-1], word[i-1]);
+        }
+    }
+
+    ghost function Pick<T>(s: set<T>): T
+        requires s != {}
+        ensures Pick(s) in s
+    {
+        var x :| x in s;
+        x
+    }
+
+    lemma NfaSequenceOfDfa2<State(!new, ==), Alphabet(!new, ==)>(dfa: DFA<State, Alphabet>, word: seq<Alphabet>, nfa_path: seq<set<State>>, dfa_path: seq<State>, i: int)
+        requires ValidDfa(dfa)
+        requires StateMachines.ValidString(dfa, word)
+        requires NFAutomata.Accepted(DfaToNfa(dfa), word)
+        requires IsValidNfaTrace(DfaToNfa(dfa), word, nfa_path)
+        requires NfaExtendedDelta(DfaToNfa(dfa), {dfa.startState}, word) == nfa_path[|word|]
+        requires 0 <= i < |word|
+        requires forall i :: 0 <= i <= |word| ==> |nfa_path[i]| == 1
+        requires dfa_path == seq(|word|+1, i requires 0 <= i < |word|+1 => Pick(nfa_path[i]));
+        ensures dfa_path[i+1] == dfa.transition(dfa_path[i], word[i])
+    {
+        if i == 0 {
+            assert nfa_path[0] == EpsilonClosure(DfaToNfa(dfa), {dfa.startState});
+            EpsilonClosureWithNoEpsilons(DfaToNfa(dfa), nfa_path[0]);
+            assert nfa_path[0] == {dfa.startState};
+            assert dfa_path[0] == dfa.startState;
+            assert nfa_path[0] == {dfa.startState};
+            assert nfa_path[1] == EpsilonClosure(DfaToNfa(dfa), {dfa.transition(dfa.startState, word[0])});
+            EpsilonClosureWithNoEpsilons(DfaToNfa(dfa), {dfa.transition(dfa.startState, word[0])});
+
+            assert dfa_path[1] == dfa.transition(dfa.startState, word[0]);
+
+        }else{
+            var q := dfa.transition(dfa_path[i-1], word[i-1]);
+            NfaSequenceOfDfa2(dfa, word, nfa_path, dfa_path, i-1);
+            assert q in nfa_path[i];
+            assert |nfa_path[i]-{q}| == 0;
+            assert nfa_path[i]  =={dfa.transition(dfa_path[i-1], word[i-1])};
+            EpsilonClosureWithNoEpsilons(DfaToNfa(dfa), {dfa.transition(dfa_path[i-1], word[i-1])});
+            // EpsilonClosureWithNoEpsilons(DfaToNfa(dfa), nfa_path[i]);
+            assert dfa_path[i+1] == dfa.transition(dfa_path[i], word[i]);
+        }
+    }
+
+    lemma {:isolate_assertions} DFA_NFA_Equivalent<State(!new, ==), Alphabet(!new, ==)>(dfa: DFA<State, Alphabet>)
+        requires ValidDfa(dfa)
+        ensures Language(dfa) == NFALanguage(DfaToNfa(dfa))
+    {
+        var nfa := DfaToNfa(dfa);
+        assert ValidNfa(nfa);
+        assert dfa.alphabet == nfa.alphabet;
+
+        forall word | word in Language(dfa)
+            ensures NFAutomata.Accepted(nfa, word)
+        {
+            ComputeStateSequenceAccepting(dfa, word);
+            var dfa_path := ComputeStateSequence(dfa, word);
+            var dfa_final_state: State := dfa_path[ |word| ];
+            assert dfa_final_state in dfa.acceptStates;
+            var nfa_path := seq(|word|+1, i requires 0 <= i < |word|+1 => {dfa_path[i]});
+            assert dfa_path[0] == dfa.startState;
+            assert nfa_path[0] == EpsilonClosure(nfa, {nfa.startState});
+            forall i | 0 <= i < |word| 
+              ensures nfa_path[i] <= nfa.states && NfaTransitionStep(nfa, nfa_path[i], word[i], nfa_path[i+1])
+            {
+                AreTransitionsOfDfaToNfa(dfa, word, dfa_path, i);
+            }
+            assert IsValidNfaTrace(nfa, word, nfa_path);
+            assert nfa.acceptStates == dfa.acceptStates;
+            assert dfa_final_state in nfa.acceptStates;
+            assert nfa_path[|word|] == {dfa_final_state};
+            assert dfa_final_state in {dfa_final_state};
+            assert dfa_final_state in ({dfa_final_state} * nfa.acceptStates);
+            assert {dfa_final_state} * nfa.acceptStates != {};
+            assert nfa_path[|word|] * nfa.acceptStates != {};
+            // assert dfa_final_state * nfa.acceptStates != {};
+        }
+
+        forall word | word in NFALanguage(nfa)
+            ensures StateMachines.Accepted(dfa, word)
+        {
+            assert NFAutomata.Accepted(nfa, word);
+            NfaExtendedDeltaComputesTrace(nfa, word);
+            NfaExtendedDeltaAccepting(nfa, word);
+            var nfa_path :| IsValidNfaTrace(nfa, word, nfa_path) &&
+                            NfaExtendedDelta(nfa, {nfa.startState}, word) == nfa_path[|word|];
+            assert nfa_path[|word|] * nfa.acceptStates != {};
+            var nfa_final_states := nfa_path[|word|];
+            assert nfa_final_states * nfa.acceptStates != {};
+            forall i | 0 <= i <= |word| 
+                ensures |nfa_path[i]| == 1
+            {
+                NfaSequenceOfDfa(dfa, word, nfa_path, i);
+            }
+            var dfa_path := seq(|word|+1, i requires 0 <= i < |word|+1 => Pick(nfa_path[i]));
+            assert dfa_path[0] == dfa.startState;
+            forall i | 1 <= i < |word| 
+                ensures dfa_path[i+1] == dfa.transition(dfa_path[i], word[i])
+            {
+                NfaSequenceOfDfa2(dfa, word, nfa_path, dfa_path, i);
+            }
+            var fs := Pick(nfa_path[|word|]);
+            assert |nfa_path[|word|]-{fs}| == 0;
+            assert fs in dfa.acceptStates;
+            assert dfa_path[|word|] == fs;
+            assert dfa_path[|word|] in dfa.acceptStates;
+            assert nfa_path[|word|] == {dfa_path[|word|]};
+            assert dfa_path[|word|] in dfa.acceptStates;
+        }
+    }
+    
+
     function NfaDfaDelta<State(!new, ==), Alphabet(!new, ==)>(nfa: NFA, R: set<State>, a: Alphabet): set<State>
         requires ValidNfa(nfa)
         ensures NfaDfaDelta(nfa, R, a) in set state | state <= nfa.states :: state
@@ -254,6 +413,107 @@ lemma DfaPathCorrespondsToNfaPath<State(!new), Alphabet(!new)>(nfa: NFA<State, A
         assert ac in x * nfa.acceptStates;
         assert x * nfa.acceptStates != {};
        }
+    }
+
+    ghost function ConcatenateLanguage<Alphabet>(l1: iset<seq<Alphabet>>, l2: iset<seq<Alphabet>>): iset<seq<Alphabet>>
+    {
+        iset x,y | x in l1 && y in l2 :: x + y
+    }
+
+    lemma RegularLanguageHasNFA<State(!new), Alphabet(!new)>(language: iset<seq<Alphabet>>, alphabet: set<Alphabet>)
+        requires StateMachines.IsRegularLanguage<State, Alphabet>(language, alphabet)
+        ensures exists nfa: NFA<State, Alphabet> :: ValidNfa(nfa) && NFALanguage(nfa) == language && nfa.alphabet == alphabet
+    {
+        var dfa: DFA<State, Alphabet> :| ValidDfa(dfa) && Language(dfa) == language && dfa.alphabet == alphabet;
+        var nfa := DfaToNfa(dfa);
+        DFA_NFA_Equivalent(dfa);
+    }
+
+    function ConcatNfas<State(!new), Alphabet(!new)>(nfa1: NFA<State, Alphabet>, nfa2: NFA<State, Alphabet>): NFA<State, Alphabet>
+        requires ValidNfa(nfa1)
+        requires ValidNfa(nfa2)
+        requires nfa1.states !! nfa2.states
+        requires nfa1.alphabet == nfa2.alphabet
+        ensures ValidNfa(ConcatNfas(nfa1,nfa2))
+    {
+        var transitions: map<(State, Alphabet), set<State>> := nfa1.transitions + nfa2.transitions;
+        var epsilonTransitions: map<State, set<State>> := nfa2.epsilonTransitions + map q | q in nfa1.epsilonTransitions.Keys + nfa1.acceptStates :: if q in nfa1.epsilonTransitions && q !in nfa1.acceptStates then
+                // Case 1: q has epsilons but is NOT an accept state.
+                // Action: Keep its original transitions only.
+                nfa1.epsilonTransitions[q]
+            else if q in nfa1.epsilonTransitions && q in nfa1.acceptStates then
+                // Case 2: q has epsilons AND IS an accept state.
+                // Action: Add the bridge to its existing transitions.
+                nfa1.epsilonTransitions[q] + {nfa2.startState}
+            else // This implies `q !in nfa1.epsilon_transitions` but `q in nfa1.acceptStates`
+                // Case 3: q has no epsilons but IS an accept state.
+                // Action: Create a new bridge transition.
+                {nfa2.startState};
+        NFA(nfa1.states + nfa2.states, nfa1.startState, nfa2.acceptStates, nfa1.alphabet, transitions, epsilonTransitions)
+    }
+
+
+
+    lemma {:isolate_assertions} ConcatNfasMatchLanguage<State(!new),Alphabet(!new)>(nfa1: NFA<State, Alphabet>, nfa2: NFA<State, Alphabet>)
+        requires ValidNfa(nfa1)
+        requires ValidNfa(nfa2)
+        requires nfa1.states !! nfa2.states
+        requires nfa1.alphabet == nfa2.alphabet
+        ensures NFALanguage(ConcatNfas(nfa1, nfa2)) == ConcatenateLanguage(NFALanguage(nfa1), NFALanguage(nfa2))
+    {
+        var cnfa := ConcatNfas(nfa1, nfa2);
+        forall word | word in NFALanguage(cnfa)
+            ensures word in ConcatenateLanguage(NFALanguage(nfa1), NFALanguage(nfa2))
+        {
+            NfaExtendedDeltaComputesTrace(cnfa, word);
+            NfaExtendedDeltaAccepting(cnfa, word);
+            var cnfa_path :| IsValidNfaTrace(cnfa, word, cnfa_path) &&
+                            NfaExtendedDelta(cnfa, {cnfa.startState}, word) == cnfa_path[|word|];
+        }
+
+        forall word | word in ConcatenateLanguage(NFALanguage(nfa1), NFALanguage(nfa2))
+            ensures  word in NFALanguage(ConcatNfas(nfa1, nfa2))
+        {
+            var s1, s2 :| s1 + s2 == word && s1 in NFALanguage(nfa1) && s2 in NFALanguage(nfa2);
+            assert NFAutomata.ValidString(nfa1, s1) && NFAutomata.Accepted(nfa1, s1);
+            assert NFAutomata.ValidString(nfa2, s2) && NFAutomata.Accepted(nfa2, s2);
+
+            NfaExtendedDeltaComputesTrace(nfa1, s1);
+            NfaExtendedDeltaAccepting(nfa1, s1);
+            var nfa_path1 :| IsValidNfaTrace(nfa1, s1, nfa_path1) &&
+                            NfaExtendedDelta(nfa1, {nfa1.startState}, s1) == nfa_path1[|s1|];
+
+            NfaExtendedDeltaComputesTrace(nfa2, s2);
+            NfaExtendedDeltaAccepting(nfa2, s2);
+            var nfa_path2 :| IsValidNfaTrace(nfa2, s2, nfa_path2) &&
+                            NfaExtendedDelta(nfa2, {nfa2.startState}, s2) == nfa_path2[|s2|];
+            assert IsValidNfaTrace(ConcatNfas(nfa1, nfa2), s1, nfa_path1);
+            // assert IsValidNfaTrace(ConcatNfas(nfa1, nfa2), s2, nfa_path2);
+        }
+    }
+
+    
+    lemma ConcatenateOfRegularLanguagesIsRegular<State(!new),Alphabet(!new)>(
+        L1: iset<seq<Alphabet>>, 
+        L2: iset<seq<Alphabet>>, 
+        alphabet: set<Alphabet>)
+        requires IsRegularLanguage<State, Alphabet>(L1, alphabet)
+        requires IsRegularLanguage<State, Alphabet>(L2, alphabet)
+        ensures IsRegularLanguage<set<State>, Alphabet>(ConcatenateLanguage(L1, L2), alphabet)
+
+    {
+        var dfa1: DFA<State, Alphabet> :| ValidDfa(dfa1) && dfa1.alphabet == alphabet && L1 == Language(dfa1);
+        var dfa2: DFA<State, Alphabet> :| ValidDfa(dfa2) && dfa2.alphabet == alphabet && L2 == Language(dfa2);
+        var nfa1 := DfaToNfa(dfa1);
+        var nfa2 := DfaToNfa(dfa2);
+        DFA_NFA_Equivalent(dfa1);
+        DFA_NFA_Equivalent(dfa2);
+        assume nfa1.states !! nfa2.states;
+        var cnfa := ConcatNfas(nfa1, nfa2);
+        // ConcatNfaValid(nfa1, nfa2);
+        ConcatNfasMatchLanguage(nfa1, nfa2);
+        var dfa := NfaToDfa(cnfa);
+        NFA_DFA_Equivalent(cnfa);
     }
 
 }

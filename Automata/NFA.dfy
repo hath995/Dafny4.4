@@ -14,7 +14,10 @@ module NFAutomata {
     nfa.startState in nfa.states &&
     nfa.acceptStates <= nfa.states &&
     (forall s, a :: s in nfa.states && a in nfa.alphabet ==> (s,a) in nfa.transitions && nfa.transitions[(s, a)] <= nfa.states) &&
-    (forall s :: s in nfa.states && s in nfa.epsilonTransitions ==> nfa.epsilonTransitions[s] <= nfa.states)
+    (forall p :: p in nfa.transitions ==> p.0 in nfa.states && p.1 in nfa.alphabet) &&
+    (forall s :: s in nfa.states && s in nfa.epsilonTransitions ==> nfa.epsilonTransitions[s] <= nfa.states) &&
+    (forall s :: s in nfa.epsilonTransitions.Keys ==> s in nfa.states)
+
   }
 
 

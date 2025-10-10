@@ -644,7 +644,10 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     ghost predicate Accepted<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>)
         requires ValidDfa(d) && ValidString(d, s)
     {
-        exists states: seq<State> :: |states| == |s| + 1 && states[0] == d.startState && states[|s|] in d.acceptStates && (forall i :: 0 <= i < |states| ==> states[i] in d.states) && (forall i :: 1 <= i < |s| + 1 ==> states[i] == d.transition(states[i-1], s[i-1]))
+        exists states: seq<State> :: |states| == |s| + 1 && states[0] == d.startState &&
+            states[|s|] in d.acceptStates &&
+            (forall i :: 0 <= i < |states| ==> states[i] in d.states) &&
+            (forall i :: 1 <= i < |s| + 1 ==> states[i] == d.transition(states[i-1], s[i-1]))
     }
 
     lemma AcceptedRequiresAcceptState<State(!new,==), Alphabet(==)>(d: DFA<State, Alphabet>, s: seq<Alphabet>, states: seq<State>)
@@ -971,17 +974,17 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
     }
 
     // Main theorem: Union of two regular languages is regular
-    lemma UnionOfRegularLanguagesIsRegular<Alphabet(!new)>(
+    lemma UnionOfRegularLanguagesIsRegular<State(!new),Alphabet(!new)>(
         L1: iset<seq<Alphabet>>, 
         L2: iset<seq<Alphabet>>, 
         alphabet: set<Alphabet>)
-        requires IsRegularLanguage<nat, Alphabet>(L1, alphabet)
-        requires IsRegularLanguage<nat, Alphabet>(L2, alphabet)
-        ensures IsRegularLanguage<(nat, nat), Alphabet>(L1 + L2, alphabet)
+        requires IsRegularLanguage<State, Alphabet>(L1, alphabet)
+        requires IsRegularLanguage<State, Alphabet>(L2, alphabet)
+        ensures IsRegularLanguage<(State, State), Alphabet>(L1 + L2, alphabet)
     {
         // Extract witness DFAs for L1 and L2
-        var dfa1: DFA<nat, Alphabet> :| ValidDfa(dfa1) && dfa1.alphabet == alphabet && L1 == Language(dfa1);
-        var dfa2: DFA<nat, Alphabet> :| ValidDfa(dfa2) && dfa2.alphabet == alphabet && L2 == Language(dfa2);
+        var dfa1: DFA<State, Alphabet> :| ValidDfa(dfa1) && dfa1.alphabet == alphabet && L1 == Language(dfa1);
+        var dfa2: DFA<State, Alphabet> :| ValidDfa(dfa2) && dfa2.alphabet == alphabet && L2 == Language(dfa2);
         
         // Construct the union DFA
         var unionDFA := UnionDfa(dfa1, dfa2);
@@ -996,7 +999,7 @@ lemma RegexMatchLanguageLemma<Alphabet(!new,==)>(r: RegExp<Alphabet>)
         assert L1 + L2 == Language(unionDFA);
         
         // Therefore L1 ∪ L2 is regular
-        assert IsRegularLanguage<(nat, nat), Alphabet>(L1 + L2, alphabet);
+        assert IsRegularLanguage<(State, State), Alphabet>(L1 + L2, alphabet);
     }
 
     // Helper lemma: The union DFA recognizes exactly the union of the languages

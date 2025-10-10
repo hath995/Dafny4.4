@@ -7,6 +7,12 @@ module SeqCustom {
     {
         if xs == [] then {} else {xs[0]}+ToSet(xs[1..])
     }
+    
+    lemma ToSetConcat<T>(xs: seq<T>, ys: seq<T>)
+        ensures ToSet(xs+ys) == ToSet(xs) + ToSet(ys)
+    {
+
+    }
 
     predicate substring1<A(==)>(sub: seq<A>, super: seq<A>) {
         exists k :: 0 <= k < |super| && sub <= super[k..]
@@ -485,6 +491,7 @@ module SeqCustom {
             xs[1..];
         }
     }
+
     
     method SeqTest() {
         var t1 := [4,5,6,1,2,3];

@@ -16,8 +16,8 @@ module Combinatorics {
         set a | a in xs :: (a, y)
     }
 
-    function ToPairA<A(==),B(==)>(x: A, ys: set<B>): set<(A,B)> {
-        set b | b in ys :: (x, b)
+    function ToPairA<A(==),B(==)>(x: A, bs: set<B>): set<(A,B)> {
+        set b | b in bs :: (x, b)
     }
 
     function SevenTuples<A>(xs: set<A>): set<(A,A,A,A,A,A,A)> {
@@ -184,7 +184,7 @@ module Combinatorics {
             // }
             assert Cross(a, b) == Cross(a - {a1}, b) + ToPairA(a1, b);
             ToPairASize(a1, b);
-            assert |Cross(a, b)| == |Cross(a - {a1}, b)| + |b|;
+            // assert |Cross(a, b)| == |Cross(a - {a2}, b)| + |b|;
         }
     }
     datatype IteratedSet<A(==)> = Base(a: A) | Pair(left: A, right: IteratedSet<A>)
@@ -276,6 +276,107 @@ module Combinatorics {
         // assert |threes2| == 10 * 10 * 10;
         // assert |threes3| == 10 * 10 * 10;
         // assert threes2 == threes3;
+    }
+
+    function PowerSet<A(==)>(elems: set<A>): set<set<A>> {
+        set xs | xs <= elems
+    }
+
+    lemma PowerSetEmptySet<A(==)>(elems: set<A>)
+        requires elems == {}
+        ensures PowerSet(elems) == {{}}
+    {
+        assert elems <= elems;
+        if xs :| xs in PowerSet(elems) && xs != {} {
+            assert false;
+        }
+    }
+
+    lemma PowerSetOneElem<A(==)>(elems: set<A>, x: A)
+        requires |elems| == 1
+        requires x in elems
+        ensures PowerSet(elems) == {{}, {x}}
+    {
+            if xs :| xs in PowerSet(elems) && xs != {} && xs != {x} {
+                assert |elems-{x}| == 0;
+                assert false;
+            }
+            assert PowerSet(elems) == {{},{x}};
+    }
+
+    function NatPow(base: nat, exp: nat): nat {
+        if exp == 0 then 
+            1 
+        else if exp == 1 then
+            base
+        else base * NatPow(base, exp-1)
+    }
+
+    lemma NatPowAdd(base: nat, x: nat, y: nat)
+        ensures NatPow(base, x) * NatPow(base, y) == NatPow(base, x + y)
+    {
+        if x == 0 {
+
+        } else if x == 1 {
+
+        }else {
+            NatPowAdd(base, x-1, y);
+        }
+    }
+
+    lemma PowerSetSize<A(==)>(elems: set<A>)
+        ensures |PowerSet(elems)| == NatPow(2, |elems|)
+    {
+        if |elems| == 0 {
+            assert elems == {};
+            assert {} in PowerSet(elems);
+            if xs :| xs in PowerSet(elems) && xs != {} {
+                assert false;
+            }
+            assert PowerSet(elems) == {{}};
+            // assert NatPow(2, 0) == 1;
+            // assert |PowerSet(elems)| == NatPow(2, |elems|);
+        } else if |elems| == 1 {
+            var x :| x in elems;
+            // assert {} in PowerSet(elems);
+            // assert {x} in PowerSet(elems);
+            if xs :| xs in PowerSet(elems) && xs != {} && xs != {x} {
+                assert |elems-{x}| == 0;
+                assert false;
+            }
+            assert PowerSet(elems) == {{},{x}};
+            // assert |PowerSet(elems)| == NatPow(2, |elems|);
+        }else {
+            var x :| x in elems;
+            var subsets := PowerSet(elems);
+            var subsetsMinusX := PowerSet(elems-{x});
+            PowerSetSize(elems-{x});
+            assert forall ss :: ss in subsetsMinusX ==> ss in subsets;
+            assert |subsetsMinusX| == NatPow(2, |elems|-1);
+            var withX := set ss | ss in subsetsMinusX :: ss+{x};
+            BijectionImpliesEqualCardinality(subsetsMinusX, withX, (xs: set<A>) => xs+{x}, (xx: set<A>) => xx-{x});
+            assert |withX| == |subsetsMinusX|;
+            assert |withX| == NatPow(2, |elems|-1);
+            assert forall xx :: xx in withX ==> xx in subsets;
+            assert subsets == withX + subsetsMinusX by {
+                forall xx | xx in subsets
+                    ensures xx in withX || xx in subsetsMinusX
+                {
+                    if x in xx {
+                        var wox := xx-{x};
+                        assert wox in subsetsMinusX;
+                        assert wox+{x} in withX;
+                        assert xx == wox+{x};
+                        assert xx in withX;
+                    }else{
+                        assert xx in subsetsMinusX;
+
+                    }
+                }
+            }
+            // assert |PowerSet(elems)| == NatPow(2, |elems|);
+
+        }
     }
 
     // function telephoneNumbers(): set<seq<int>> {
