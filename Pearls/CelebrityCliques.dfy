@@ -2,17 +2,18 @@ include "../examples/combinatorics.dfy"
 include "../lib/seq.dfy"
 include "./SeqFunctions.dfy"
 
-module CelebrityCliques {
+abstract module CelebrityCliques {
     import opened Combinatorics
     import opened SeqCustom
     import opened SeqFunctions
     // import opened Std.Collections.Seq
+    type Person(!new, ==)
 
 
 
-    predicate Knows<Person>(a: Person, b: Person)
+    predicate Knows(a: Person, b: Person)
 
-    predicate IsCelebrityClique<Person>(cs: set<Person>, ps: set<Person>)
+    predicate IsCelebrityClique(cs: set<Person>, ps: set<Person>)
     {
         cs != {}
         && cs <= ps
@@ -21,7 +22,7 @@ module CelebrityCliques {
         )
     }
 
-    lemma CelebrityCliqueIsUnique<Person>(ps: set<Person>, cs: set<Person>, cs': set<Person>)
+    lemma CelebrityCliqueIsUnique(ps: set<Person>, cs: set<Person>, cs': set<Person>)
         requires IsCelebrityClique(cs, ps)
         requires IsCelebrityClique(cs', ps)
         // requires cs != {} && cs' != {}
@@ -67,13 +68,13 @@ module CelebrityCliques {
             subsetSeqs(xs[1..])
     }
 
-    lemma lemmaSubsetSeqsContainsEmpty<T(==)>(xs: seq<T>)
+    lemma lemmaSubsetSeqsContainsEmpty<T>(xs: seq<T>)
         requires distinct(xs)
         ensures [] in subsetSeqs(xs)
     {
     }
 
-    lemma subsetSeqsContains<T(==)>(xs: seq<T>)
+    lemma subsetSeqsContains<T>(xs: seq<T>)
         requires distinct(xs)
         ensures forall yy :: yy in subsetSeqs(xs) ==> forall y :: y in yy ==> y in xs
     {
@@ -116,7 +117,7 @@ module CelebrityCliques {
         set yy | yy in subsetSeqs(xs) :: ToSet(yy)
     }
 
-    lemma subsetSeqsPowerset<T(==)>(xs: seq<T>)
+    lemma subsetSeqsPowerset<T>(xs: seq<T>)
         requires distinct(xs)
         ensures forall ss :: ss in PowerSet(ToSet(xs)) ==> ss in seqSeqsToSet(xs)
     {
@@ -183,7 +184,7 @@ module CelebrityCliques {
         }
     }
 
-    lemma concatDifferent<T(==)>(xs: seq<T>, ys: seq<T>, x: T)
+    lemma concatDifferent<T>(xs: seq<T>, ys: seq<T>, x: T)
         requires xs != ys
         ensures [x]+xs != [x]+ys
     {
@@ -195,7 +196,7 @@ module CelebrityCliques {
         }
     }
 
-    lemma subsetSeqsDistinct<T(==)>(xs: seq<T>)
+    lemma subsetSeqsDistinct<T>(xs: seq<T>)
         requires distinct(xs)
         ensures distinct(subsetSeqs(xs))
     {
@@ -234,7 +235,7 @@ module CelebrityCliques {
         }
     }
 
-    lemma LemmaSubsetSeqsDistinct<T(==)>(xs: seq<T>)
+    lemma LemmaSubsetSeqsDistinct<T>(xs: seq<T>)
         requires distinct(xs)
         ensures forall ss :: ss in subsetSeqs(xs) ==> distinct(ss)
     {
@@ -283,14 +284,14 @@ module CelebrityCliques {
         }
     }
 
-    lemma setsNotEqualPlusOne<T(==)>(ss: set<T>, yy: set<T>, x: T)
+    lemma setsNotEqualPlusOne<T>(ss: set<T>, yy: set<T>, x: T)
         requires ss != yy
         requires x !in ss
         requires x !in yy
         ensures {x}+ss != {x}+yy
     {}
 
-    lemma subsetSeqToSetNotEqual<T(==)>(xs: seq<T>)
+    lemma subsetSeqToSetNotEqual<T>(xs: seq<T>)
         requires distinct(xs)
         ensures forall i,j :: i != j && 0 <= i < |subsetSeqs(xs)| && 0 <= j < |subsetSeqs(xs)| ==> ToSet(subsetSeqs(xs)[i]) != ToSet(subsetSeqs(xs)[j])
     {
@@ -354,7 +355,7 @@ module CelebrityCliques {
         filter (<|(p:ps) (subseqs (p:ps)))
     */
 
-    function FindCCliqueNaive<Person(!new)(==)>(xs: seq<Person>): seq<seq<Person>>
+    function FindCCliqueNaive(xs: seq<Person>): seq<seq<Person>>
         requires distinct(xs)
         ensures forall cs :: cs in FindCCliqueNaive(xs) ==> IsCelebrityClique(ToSet(cs), ToSet(xs))
         ensures FindCCliqueNaive(xs) != [] ==> |FindCCliqueNaive(xs)| == 1
@@ -381,25 +382,26 @@ module CelebrityCliques {
         result
     }
 
-    predicate nonmember<Person(==)>(p: Person, cs: set<Person>) 
+    predicate nonmember(p: Person, cs: set<Person>) 
     {
         forall c :: c in cs ==> Knows(p, c) && !Knows(c, p)
     }
 
-    predicate member<Person(==)>(p: Person, cs: set<Person>, ps: set<Person>) 
+    predicate member(p: Person, cs: set<Person>, ps: set<Person>) 
     {
+        // forall x :: x in cs ==> Knows(x, p) && (Knows(p,x) <==> x in cs)
         forall x :: x in ps ==> Knows(x, p) && (Knows(p,x) <==> x in cs)
     }
 
-    lemma opps1<Person(==)>(p: Person, cs: set<Person>, ps: set<Person>)
-        requires p in ps
-        requires cs <= ps
-        requires nonmember(p, cs)
-        ensures !member(p, cs, ps)
-    {
-    }
+    // lemma opps1(p: Person, cs: set<Person>, ps: set<Person>)
+    //     requires p in ps
+    //     requires cs <= ps
+    //     requires nonmember(p, cs)
+    //     ensures !member(p, cs, ps)
+    // {
+    // }
 
-    // lemma opps4<Person(==)>(p: Person, cs: set<Person>, ps: set<Person>)
+    // lemma opps4<Person(==)>(p: Person, cs: set, ps: set<Person>)
     //     requires p in ps
     //     requires cs <= ps
     //     requires !nonmember(p, cs)
@@ -407,15 +409,15 @@ module CelebrityCliques {
     // {
     // }
 
-    lemma opps2<Person(==)>(p: Person, cs: set<Person>, ps: set<Person>)
-        requires p in ps
-        requires cs <= ps
-        requires member(p, cs, ps)
-        ensures !nonmember(p, cs)
-    {
-    }
+    // lemma opps2(p: Person, cs: set<Person>, ps: set<Person>)
+    //     requires p in ps
+    //     requires cs <= ps
+    //     requires member(p, cs, ps)
+    //     ensures !nonmember(p, cs)
+    // {
+    // }
 
-    // lemma {:isolate_assertions} opps3<Person(==)>(p: Person, cs: set<Person>, ps: seq<Person>)
+    // lemma {:isolate_assertions} opps3<Person(==)>(p: Person, cs: set, ps: seq<Person>)
     //     requires |ps| > 1
     //     requires p == ps[0]
     //     requires cs <= ToSet(ps)
@@ -448,7 +450,7 @@ module CelebrityCliques {
     //         assert nonmember(p, cs);
     //     }
     // }
-    lemma opps5<Person(==)>(p: Person, cs: set<Person>, ps: set<Person>)
+    lemma opps5(p: Person, cs: set<Person>, ps: set<Person>)
         requires p in ps
         requires cs <= ps
         requires cs == {}
@@ -465,7 +467,7 @@ module CelebrityCliques {
         }
     }
 
-    // lemma NonMemberSimplification<Person(==)>(xs: seq<Person>, people: seq<Person>) 
+    // lemma NonMemberSimplification<Person(==)>(xs: seq, people: seq<Person>) 
     //     requires |xs| > 1
     //     requires ToSet(xs) <= ToSet(people)
     //     ensures IsCelebrityClique(ToSet(xs),  ToSet(people)) == IsCelebrityClique(ToSet(xs[1..]), ToSet(people)) && nonmember(xs[0], ToSet(xs[1..]))
@@ -473,13 +475,13 @@ module CelebrityCliques {
 
     // }
 
-    // lemma testMember<Person>(p: Person, ps: seq<Person>)
+    // lemma testMember(p: Person, ps: seq<Person>)
     //     requires p in ps
     //     requires forall x :: x in ToSet(ps) ==> Knows(x, p)
     //     ensures member(p, ToSet([]), ToSet(ps))
     // {}
 
-    lemma testnonMember<Person>(p: Person, ps: seq<Person>)
+    lemma testnonMember(p: Person, ps: seq<Person>)
         requires p in ps
         ensures nonmember(p, ToSet([]))
     {}
@@ -490,7 +492,7 @@ module CelebrityCliques {
                            filter (nonmember p) css
                            where css = ccliques ps
     */
-    function ccliques<Person(!new)(==)>(ps: seq<Person>): seq<seq<Person>> 
+    function ccliques(ps: seq<Person>): seq<seq<Person>> 
         requires distinct(ps)
         ensures 1 <= |ccliques(ps)|
         ensures [] in ccliques(ps)
@@ -552,13 +554,13 @@ module CelebrityCliques {
         // assert res[0] == f(xs[0]);
     }
 
-    // lemma BirdTransorm<Person>(ps: seq<Person>)
+    // lemma BirdTransorm(ps: seq<Person>)
     //     ensures filter(IsCelebrityClique, subsetSeqs(ps)) ==  filter(nonmember(p), filter(IsCelebrityClique) subsetSeqs)
     // {
 
     // }
 
-    function op<Person(!new)(==)>(p: Person, cs: seq<Person>): seq<Person>
+    function op(p: Person, cs: seq<Person>): seq<Person>
     {
         if cs == [] then 
             [p]
@@ -571,10 +573,10 @@ module CelebrityCliques {
             else
                 [p]+cs
     }
-    // function opSetup<Person(!new)(==)>(ps: seq<Person>): (Person, seq<Person>) -> seq<Person> 
+    // function opSetup<Person(!new)(==)>(ps: seq): (Person, seq<Person>) -> seq<Person> 
     //         ensures |opSetup(ps)(p,cs)| > 0 ==> IsCelebrityClique(ToSet(cclique'(cs)), ToSet(ps))
     // {
-    //     (p: Person, cs: seq<Person>) =>
+    //     (p: Person, cs: seq) =>
         
     //         if cs == [] then 
     //             [p]
@@ -589,19 +591,19 @@ module CelebrityCliques {
         
     // }
 
-    function cclique'<Person(!new)(==)>(ps: seq<Person>): seq<Person>
+    function cclique'(ps: seq<Person>): seq<Person>
         requires distinct(ps)
     {
         FoldRight(op, ps, [])
     }
 
-    function cclique<Person(!new)(==)>(ps: seq<Person>): seq<Person>
+    function cclique(ps: seq<Person>): seq<Person>
         requires distinct(ps)
     {
         ccliques(ps)[0]
     }
 
-    lemma ccliqueNotNull<Person(!new)>(ps: seq<Person>)
+    lemma ccliqueNotNull(ps: seq<Person>)
         requires distinct(ps)
         requires |cclique(ps)| != 0
         ensures exists cs :: cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps))
@@ -620,7 +622,7 @@ module CelebrityCliques {
         // assert ccliques(ps)[0] in subsetSeqs(ps);
     }
 
-    lemma restIsAlsoCelebrityClique<Person(!new)>(ps: seq<Person>, cs: seq<Person>) 
+    lemma restIsAlsoCelebrityClique(ps: seq<Person>, cs: seq<Person>) 
         requires distinct(ps)
         requires forall q: Person :: q in ps ==> Knows(q,q)
         requires cs in subsetSeqs(ps)
@@ -651,7 +653,7 @@ module CelebrityCliques {
         assert IsCelebrityClique(ToSet(cs[1..]), ToSet(ps[1..]));
     }
 
-    lemma {:isolate_assertions} {:verify false} cclique'Correctness<Person(!new)(==)>(ps: seq<Person>)
+    lemma {:isolate_assertions} cclique'Correctness(ps: seq<Person>)
         requires distinct(ps)
         requires forall q: Person :: q in ps ==> Knows(q,q)
         ensures ToSet(cclique'(ps)) <= ToSet(ps)
@@ -677,9 +679,9 @@ module CelebrityCliques {
                 op(ps[0], []);
                 [ps[0]];
             }
-            assert ps[0] in ps;
+            // assert ps[0] in ps;
             assert ToSet([ps[0]]) <= ToSet(ps);
-            assert IsCelebrityClique(ToSet([ps[0]]), ToSet(ps));
+            // assert IsCelebrityClique(ToSet([ps[0]]), ToSet(ps));
         } else{
             cclique'Correctness(ps[1..]);
             assert ps == [ps[0]]+ps[1..];
@@ -696,46 +698,24 @@ module CelebrityCliques {
                     op(ps[0], []);
                     [ps[0]];
                 }
-                assert ps[0] in ps;
+                // assert ps[0] in ps;
                 assert ToSet([ps[0]]) <= ToSet(ps);
-                assert IsCelebrityClique(ToSet([ps[0]]), ToSet(ps));
-                assert |cclique'(ps)| == 0 ==> (forall ss :: ss in subsetSeqs(ps) ==> !IsCelebrityClique(ToSet(cclique'(ss)), ToSet(ps)));
+                // assert IsCelebrityClique(ToSet([ps[0]]), ToSet(ps));
+                // assert |cclique'(ps)| == 0 ==> (forall ss :: ss in subsetSeqs(ps) ==> !IsCelebrityClique(ToSet(cclique'(ss)), ToSet(ps)));
 
             }else{
                 assert |folded| >= 1;
                 assert ToSet(folded) <= ToSet(ps[1..]);
                 var p := ps[0];
                 var c := folded[0];
-                assert ps[0] in ps;
+                // assert ps[0] in ps;
                 assert ToSet([ps[0]]) <= ToSet(ps);
                 if exists cs :: cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps)) {
                     if !Knows(p, c) {
-                        assert !IsCelebrityClique(ToSet([p]+folded), ToSet(ps));
-                        assert Knows(p,p);
                         LemmaSubsetSeqsDistinct(ps[1..]);
-                        if exists cs :: cs in subsetSeqs(ps[1..]) && IsCelebrityClique(ToSet(cs), ToSet(ps[1..])) {
-                            assert folded in subsetSeqs(ps[1..]);
-                            assert IsCelebrityClique(ToSet(folded), ToSet(ps[1..]));
-                            assert forall ss :: ss in subsetSeqs(ps[1..]) && ss != folded ==> !IsCelebrityClique(ToSet(ss), ToSet(ps[1..])) by {
-                                subsetSeqsDistinct(ps[1..]);
-                                subsetSeqToSetNotEqual(ps[1..]);
-                                forall ss | ss in subsetSeqs(ps[1..]) && ss != folded
-                                    ensures !IsCelebrityClique(ToSet(ss), ToSet(ps[1..]))
-                                {
-                                    if IsCelebrityClique(ToSet(ss), ToSet(ps[1..])) {
-                                        CelebrityCliqueIsUnique(ToSet(ss), ToSet(folded), ToSet(ps[1..]));
-                                        assert false;
-                                    }
-                                }
-                            }
-                        }else{
-                            
-                        }
                         lemmaSubsetSeqsContainsEmpty(ps);
                         assert [ps[0]] == prepend(ps[0], []);
                         assert [ps[0]] in subsetSeqs(ps);
-                        assert forall x:: x in ToSet(ps) ==> Knows(x, p);
-                        assert Knows(c,p);
                         if !IsCelebrityClique(ToSet([p]), ToSet(ps)) {
                             if exists cs :: cs in subsetSeqs(ps[1..]) && IsCelebrityClique(ToSet(cs), ToSet(ps[1..])) {
                                 assert !IsCelebrityClique(ToSet(folded), ToSet(ps));
@@ -753,7 +733,8 @@ module CelebrityCliques {
                                 assert ps[0] in cs;
                                 assert !IsCelebrityClique(ToSet(cs), ToSet(ps)) by {
                                     var ss :| ss in subsetSeqs(ps[1..]) && cs == prepend(ps[0], ss);
-                                    assert IsCelebrityClique(ToSet(ss), ToSet(ps[1..]));
+                                    restIsAlsoCelebrityClique(cs, ps);
+                                    // assert IsCelebrityClique(ToSet(ss), ToSet(ps[1..]));
                                     assert false;
                                 }
                                 assert false;
@@ -782,6 +763,7 @@ module CelebrityCliques {
                                 assert ps[0] in cs;
                                 assert !IsCelebrityClique(ToSet(cs), ToSet(ps)) by {
                                     var ss :| ss in subsetSeqs(ps[1..]) && cs == prepend(ps[0], ss);
+                                    restIsAlsoCelebrityClique(cs, ps);
                                     assert IsCelebrityClique(ToSet(ss), ToSet(ps[1..]));
                                     assert false;
                                 }
@@ -812,4 +794,92 @@ module CelebrityCliques {
         }
     }
 
+
+}
+
+module celebs refines CelebrityCliques {
+    datatype People = BradP | AngelinaJ | JohnnyD | Obama | Pleb1 | Pleb2 | Pleb3
+    type Person = People
+    const KnowsRel: set<(Person, Person)> := {
+        (BradP, BradP),
+        (AngelinaJ, AngelinaJ),
+        (JohnnyD, JohnnyD),
+        (Obama, Obama),
+        (Pleb1, Pleb1),
+        (Pleb2, Pleb2),
+        (Pleb3, Pleb3),
+        (BradP, AngelinaJ),
+        (BradP, JohnnyD),
+        (BradP, Obama),
+        (AngelinaJ, JohnnyD),
+        (AngelinaJ, Obama),
+        (AngelinaJ, BradP),
+        (JohnnyD, Obama),
+        (JohnnyD, BradP),
+        (JohnnyD, AngelinaJ),
+        (Pleb1, BradP),
+        (Pleb1, AngelinaJ),
+        (Pleb1, JohnnyD),
+        (Pleb1, Obama),
+        (Pleb2, BradP),
+        (Pleb2, AngelinaJ),
+        (Pleb2, JohnnyD),
+        (Pleb2, Obama),
+        (Pleb3, BradP),
+        (Pleb3, AngelinaJ),
+        (Pleb3, JohnnyD),
+        (Pleb3, Obama)
+    }
+
+    predicate Knows(a: Person, b: Person) {
+        (a, b) in KnowsRel
+    }
+
+    lemma knowsReflexive() 
+        ensures forall p: People :: true ==> Knows(p, p)
+    {
+        assert (BradP, BradP) in KnowsRel;
+        assert (AngelinaJ, AngelinaJ) in KnowsRel;
+        assert (JohnnyD, JohnnyD) in KnowsRel;
+        assert (Obama, Obama) in KnowsRel;
+        assert (Pleb1, Pleb1) in KnowsRel;
+        assert (Pleb2, Pleb2) in KnowsRel;
+        assert (Pleb3, Pleb3) in KnowsRel;
+        assert Knows(BradP, BradP);
+        assert Knows(AngelinaJ, AngelinaJ);
+        assert Knows(JohnnyD, JohnnyD);
+        assert Knows(Obama, Obama);
+        assert Knows(Pleb1, Pleb1);
+        assert Knows(Pleb2, Pleb2);
+        assert Knows(Pleb3, Pleb3);
+        if p: People :| p !in {BradP, AngelinaJ, JohnnyD, Obama, Pleb1, Pleb2, Pleb3} {
+            assert (p,p) !in KnowsRel;
+            assert p != BradP && p != AngelinaJ && p != JohnnyD && p != Obama && p != Pleb1 && p != Pleb2 && p != Pleb3;
+            assert false;
+        }
+    }
+
+    method {:test} Test() {
+        knowsReflexive();
+        var ps := [BradP, Pleb1,  AngelinaJ, Pleb2, Pleb3, JohnnyD];
+        print "\nps: ";
+        print ps;
+        print "\n";
+        assert distinct(ps);
+        // print "\nsubsetSeqs(ps): ";
+        // print subsetSeqs(ps);
+        var cs := FindCCliqueNaive(ps);
+        print "\ncs: ";
+        print cs;
+        print "\n";
+        var css := ccliques(ps);
+        print "\nccss: ";
+        print css;
+        print "\n";
+        var ccss := cclique'(ps);
+        print "\nccss: ";
+        print ccss;
+        print "\n";
+
+    }
 }
