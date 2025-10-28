@@ -14,7 +14,11 @@ module CelebrityCliques {
 
     predicate IsCelebrityClique<Person>(cs: set<Person>, ps: set<Person>)
     {
-        cs != {} && cs <= ps && forall x :: x in ps ==> (forall y :: y in cs ==> Knows(x, y) && (Knows(y, x) ==> x in cs))
+        cs != {}
+        && cs <= ps
+        && forall x :: x in ps ==> (
+            forall y :: y in cs ==> Knows(x, y) && (Knows(y, x) ==> x in cs)
+        )
     }
 
     lemma CelebrityCliqueIsUnique<Person>(ps: set<Person>, cs: set<Person>, cs': set<Person>)
@@ -61,6 +65,12 @@ module CelebrityCliques {
             Map((ss: seq<T>) => prepend(xs[0], ss), subsetSeqs(xs[1..]))
             +
             subsetSeqs(xs[1..])
+    }
+
+    lemma lemmaSubsetSeqsContainsEmpty<T(==)>(xs: seq<T>)
+        requires distinct(xs)
+        ensures [] in subsetSeqs(xs)
+    {
     }
 
     lemma subsetSeqsContains<T(==)>(xs: seq<T>)
@@ -221,6 +231,55 @@ module CelebrityCliques {
             }
             distincts(mapped, subsetSeqs(xs[1..]));
 
+        }
+    }
+
+    lemma LemmaSubsetSeqsDistinct<T(==)>(xs: seq<T>)
+        requires distinct(xs)
+        ensures forall ss :: ss in subsetSeqs(xs) ==> distinct(ss)
+    {
+        if xs == [] {
+            // Base case: xs is empty, subsetSeqs([]) = [[]]
+            // The empty sequence [] is trivially distinct
+            assert forall ss :: ss in subsetSeqs(xs) ==> distinct(ss);
+        } else if |xs| == 1 {
+            // Base case: xs has one element, subsetSeqs([x]) = [[x], []]
+            // Both [x] and [] are distinct sequences
+            assert forall ss :: ss in subsetSeqs(xs) ==> distinct(ss);
+        } else {
+            // Inductive case: xs has more than one element
+            var x := xs[0];
+            assert xs == [x] + xs[1..];
+            assert x !in xs[1..];
+            
+            // Recursively apply the lemma to xs[1..]
+            LemmaSubsetSeqsDistinct(xs[1..]);
+            subsetSeqsContains(xs[1..]);
+            
+            // subsetSeqs(xs) = Map(prepend(x, _), subsetSeqs(xs[1..])) + subsetSeqs(xs[1..])
+            var mapped := Map((ss: seq<T>) => prepend(x, ss), subsetSeqs(xs[1..]));
+            
+            // All sequences in subsetSeqs(xs[1..]) are distinct by induction hypothesis
+            assert forall ss :: ss in subsetSeqs(xs[1..]) ==> distinct(ss);
+            
+            // All sequences in mapped are distinct because:
+            // 1. prepend(x, ss) adds x to the front of ss
+            // 2. Since x is distinct from all elements in xs[1..] (because xs is distinct)
+            // 3. And ss is distinct by induction hypothesis
+            // 4. Therefore [x] + ss is distinct
+            forall ss | ss in subsetSeqs(xs[1..])
+                ensures distinct(prepend(x, ss))
+            {
+                assert distinct(ss); // by induction hypothesis
+                assert x !in ss; // because x is distinct from all elements in xs[1..]
+                assert distinct(prepend(x, ss)); // prepending a distinct element preserves distinctness
+            }
+            
+            // All sequences in mapped are distinct
+            assert forall ss :: ss in mapped ==> distinct(ss);
+            
+            // Therefore all sequences in subsetSeqs(xs) are distinct
+            assert forall ss :: ss in subsetSeqs(xs) ==> distinct(ss);
         }
     }
 
@@ -498,5 +557,259 @@ module CelebrityCliques {
     // {
 
     // }
+
+    function op<Person(!new)(==)>(p: Person, cs: seq<Person>): seq<Person>
+    {
+        if cs == [] then 
+            [p]
+        else 
+            var c := cs[0];
+            if !Knows(p, c) then
+                [p]
+            else if !Knows(c, p) then
+                cs
+            else
+                [p]+cs
+    }
+    // function opSetup<Person(!new)(==)>(ps: seq<Person>): (Person, seq<Person>) -> seq<Person> 
+    //         ensures |opSetup(ps)(p,cs)| > 0 ==> IsCelebrityClique(ToSet(cclique'(cs)), ToSet(ps))
+    // {
+    //     (p: Person, cs: seq<Person>) =>
+        
+    //         if cs == [] then 
+    //             [p]
+    //         else 
+    //             var c := cs[0];
+    //             if !Knows(p, c) then
+    //                 [p]
+    //             else if !Knows(c, p) then
+    //                 cs
+    //             else
+    //                 [p]+cs
+        
+    // }
+
+    function cclique'<Person(!new)(==)>(ps: seq<Person>): seq<Person>
+        requires distinct(ps)
+    {
+        FoldRight(op, ps, [])
+    }
+
+    function cclique<Person(!new)(==)>(ps: seq<Person>): seq<Person>
+        requires distinct(ps)
+    {
+        ccliques(ps)[0]
+    }
+
+    lemma ccliqueNotNull<Person(!new)>(ps: seq<Person>)
+        requires distinct(ps)
+        requires |cclique(ps)| != 0
+        ensures exists cs :: cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps))
+
+    {
+        calc {
+            cclique(ps);
+            ccliques(ps)[0];
+        }
+        assert ccliques(ps)[0] in ccliques(ps);
+        assert IsCelebrityClique(ToSet(ccliques(ps)[0]), ToSet(ps));
+        assert ToSet(ccliques(ps)[0]) <= ToSet(ps);
+        subsetSeqsPowerset(ps);
+        assert ToSet(ccliques(ps)[0]) in PowerSet(ToSet(ps));
+        var yy :| yy in  subsetSeqs(ps) && ToSet(yy) == ToSet(ccliques(ps)[0]);
+        // assert ccliques(ps)[0] in subsetSeqs(ps);
+    }
+
+    lemma restIsAlsoCelebrityClique<Person(!new)>(ps: seq<Person>, cs: seq<Person>) 
+        requires distinct(ps)
+        requires forall q: Person :: q in ps ==> Knows(q,q)
+        requires cs in subsetSeqs(ps)
+        requires |cs| > 1
+        requires cs[0] == ps[0]
+        requires IsCelebrityClique(ToSet(cs), ToSet(ps))
+        ensures IsCelebrityClique(ToSet(cs[1..]), ToSet(ps[1..]))
+    {
+        subsetSeqsContains(ps);
+        subsetSeqsDistinct(ps);
+        LemmaSubsetSeqsDistinct(ps);
+        assert cs == [cs[0]]+cs[1..];
+        assert cs[0] in ps;
+        assert cs[0] !in ps[1..];
+
+        assert ToSet(cs[1..]) != {};
+        assert ToSet(cs[1..]) <= ToSet(ps[1..]);
+        assert forall x :: x in ps[1..] ==> (
+            forall y :: y in cs[1..] ==> Knows(x, y) && (Knows(y, x) ==> x in cs[1..])
+        );
+
+        assert forall x :: x in ToSet(ps[1..]) ==> (
+            forall y :: y in ToSet(cs[1..]) ==> Knows(x, y) && (Knows(y, x) ==> x in ToSet(cs[1..]))
+        );
+        // assert forall q: Person :: q in ps[1..] ==> Knows(q,q);
+        // assert forall p: Person, c: Person :: p in ps[1..] && c in cs[1..] ==> Knows(p,c);
+        // assert forall p: Person, c: Person :: p in ps[1..] && c in cs[1..] ==> Knows(c,p) <==> p in ToSet(cs[1..]);
+        assert IsCelebrityClique(ToSet(cs[1..]), ToSet(ps[1..]));
+    }
+
+    lemma {:isolate_assertions} {:verify false} cclique'Correctness<Person(!new)(==)>(ps: seq<Person>)
+        requires distinct(ps)
+        requires forall q: Person :: q in ps ==> Knows(q,q)
+        ensures ToSet(cclique'(ps)) <= ToSet(ps)
+        ensures cclique'(ps) in subsetSeqs(ps)
+        ensures (exists cs :: cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps))) ==> IsCelebrityClique(ToSet(cclique'(ps)), ToSet(ps))
+        // ensures |cclique'(ps)| > 0 ==> IsCelebrityClique(ToSet(cclique'(ps)), ToSet(ps))
+        // ensures |cclique'(ps)| == 0 ==> (forall ss :: ss in subsetSeqs(ps) ==> !IsCelebrityClique(ToSet(cclique'(ss)), ToSet(ps)))
+        // ensures |op(cs)| > 0 ==> IsCelebrityClique(ToSet(cclique'(cs)), ToSet(ps))
+    {
+        if ps == [] {
+
+        } else if |ps| == 1 {
+            assert ps[1..] == [];
+            assert [] in subsetSeqs(ps[1..]);
+            assert cclique'(ps) == [ps[0]];
+            assert [] in subsetSeqs(ps[1..]);
+            assert [ps[0]] == prepend(ps[0], []);
+            assert [ps[0]] in subsetSeqs(ps);
+            calc {
+                cclique'(ps);
+                FoldRight(op, ps, []);
+                op(ps[0], FoldRight(op,[], []));
+                op(ps[0], []);
+                [ps[0]];
+            }
+            assert ps[0] in ps;
+            assert ToSet([ps[0]]) <= ToSet(ps);
+            assert IsCelebrityClique(ToSet([ps[0]]), ToSet(ps));
+        } else{
+            cclique'Correctness(ps[1..]);
+            assert ps == [ps[0]]+ps[1..];
+            var folded := cclique'(ps[1..]);
+            calc {
+                cclique'(ps);
+                FoldRight(op, ps, []);
+                op(ps[0], FoldRight(op, ps[1..], []));
+                op(ps[0], cclique'(ps[1..]));
+            }
+            if folded == [] {
+                calc{
+                    op(ps[0], cclique'(ps[1..]));
+                    op(ps[0], []);
+                    [ps[0]];
+                }
+                assert ps[0] in ps;
+                assert ToSet([ps[0]]) <= ToSet(ps);
+                assert IsCelebrityClique(ToSet([ps[0]]), ToSet(ps));
+                assert |cclique'(ps)| == 0 ==> (forall ss :: ss in subsetSeqs(ps) ==> !IsCelebrityClique(ToSet(cclique'(ss)), ToSet(ps)));
+
+            }else{
+                assert |folded| >= 1;
+                assert ToSet(folded) <= ToSet(ps[1..]);
+                var p := ps[0];
+                var c := folded[0];
+                assert ps[0] in ps;
+                assert ToSet([ps[0]]) <= ToSet(ps);
+                if exists cs :: cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps)) {
+                    if !Knows(p, c) {
+                        assert !IsCelebrityClique(ToSet([p]+folded), ToSet(ps));
+                        assert Knows(p,p);
+                        LemmaSubsetSeqsDistinct(ps[1..]);
+                        if exists cs :: cs in subsetSeqs(ps[1..]) && IsCelebrityClique(ToSet(cs), ToSet(ps[1..])) {
+                            assert folded in subsetSeqs(ps[1..]);
+                            assert IsCelebrityClique(ToSet(folded), ToSet(ps[1..]));
+                            assert forall ss :: ss in subsetSeqs(ps[1..]) && ss != folded ==> !IsCelebrityClique(ToSet(ss), ToSet(ps[1..])) by {
+                                subsetSeqsDistinct(ps[1..]);
+                                subsetSeqToSetNotEqual(ps[1..]);
+                                forall ss | ss in subsetSeqs(ps[1..]) && ss != folded
+                                    ensures !IsCelebrityClique(ToSet(ss), ToSet(ps[1..]))
+                                {
+                                    if IsCelebrityClique(ToSet(ss), ToSet(ps[1..])) {
+                                        CelebrityCliqueIsUnique(ToSet(ss), ToSet(folded), ToSet(ps[1..]));
+                                        assert false;
+                                    }
+                                }
+                            }
+                        }else{
+                            
+                        }
+                        lemmaSubsetSeqsContainsEmpty(ps);
+                        assert [ps[0]] == prepend(ps[0], []);
+                        assert [ps[0]] in subsetSeqs(ps);
+                        assert forall x:: x in ToSet(ps) ==> Knows(x, p);
+                        assert Knows(c,p);
+                        if !IsCelebrityClique(ToSet([p]), ToSet(ps)) {
+                            if exists cs :: cs in subsetSeqs(ps[1..]) && IsCelebrityClique(ToSet(cs), ToSet(ps[1..])) {
+                                assert !IsCelebrityClique(ToSet(folded), ToSet(ps));
+                                assert false;
+                            }else{
+                                var cs :| cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps)) && cs != [p];
+                                var mapped := Map(ss => prepend(ps[0], ss), subsetSeqs(ps[1..]));
+                                subsetSeqsContains(ps[1..]);
+                                assert cs in mapped by {
+                                    if cs !in mapped {
+                                        assert cs in subsetSeqs(ps[1..]);
+                                        assert false;
+                                    }
+                                }
+                                assert ps[0] in cs;
+                                assert !IsCelebrityClique(ToSet(cs), ToSet(ps)) by {
+                                    var ss :| ss in subsetSeqs(ps[1..]) && cs == prepend(ps[0], ss);
+                                    assert IsCelebrityClique(ToSet(ss), ToSet(ps[1..]));
+                                    assert false;
+                                }
+                                assert false;
+
+                            }
+                            assert false;
+                        }
+                        assert IsCelebrityClique(ToSet([p]), ToSet(ps));
+                    }else if !Knows(c, p) {
+                        assert IsCelebrityClique(ToSet(folded), ToSet(ps));
+                    }else{
+                        if !IsCelebrityClique(ToSet([p]+folded), ToSet(ps)) {
+                            if exists cs :: cs in subsetSeqs(ps[1..]) && IsCelebrityClique(ToSet(cs), ToSet(ps[1..])) {
+                                assert IsCelebrityClique(ToSet(folded), ToSet(ps));
+                                assert false;
+                            }else{
+                                var cs :| cs in subsetSeqs(ps) && IsCelebrityClique(ToSet(cs), ToSet(ps)) && cs != [p]+folded;
+                                var mapped := Map(ss => prepend(ps[0], ss), subsetSeqs(ps[1..]));
+                                subsetSeqsContains(ps[1..]);
+                                assert cs in mapped by {
+                                    if cs !in mapped {
+                                        assert cs in subsetSeqs(ps[1..]);
+                                        assert false;
+                                    }
+                                }
+                                assert ps[0] in cs;
+                                assert !IsCelebrityClique(ToSet(cs), ToSet(ps)) by {
+                                    var ss :| ss in subsetSeqs(ps[1..]) && cs == prepend(ps[0], ss);
+                                    assert IsCelebrityClique(ToSet(ss), ToSet(ps[1..]));
+                                    assert false;
+                                }
+                                assert false;
+
+                            }
+                            assert false;
+                        }
+                        assert IsCelebrityClique(ToSet([p]+folded), ToSet(ps));
+                        assert [p]+folded == prepend(p, folded);
+                        assert [p]+folded in subsetSeqs(ps);
+                    }
+                }else{
+                    if !Knows(p, c) {
+                        lemmaSubsetSeqsContainsEmpty(ps);
+                        assert [ps[0]] == prepend(ps[0], []);
+                        assert [ps[0]] in subsetSeqs(ps);
+                    } else if !Knows(c, p) {
+                    }else{
+                        assert [p]+folded == prepend(p, folded);
+                        assert [p]+folded in subsetSeqs(ps);
+
+                    }
+                }
+
+            }
+
+        }
+    }
 
 }

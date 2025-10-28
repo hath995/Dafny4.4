@@ -267,4 +267,27 @@ function Filter<T>(f: (T -> bool), xs: seq<T>): (result: seq<T>)
   //   }
     
   // }
+
+   function FoldRight<A, T>(f: (T, A) -> A, xs: seq<T>, init: A): A
+  {
+    if |xs| == 0 then init
+    else f(xs[0], FoldRight(f, xs[1..], init))
+  }
+
+  lemma LemmaFoldRightDistributesOverConcat<A, T>(f: (T, A) -> A, init: A, xs: seq<T>, ys: seq<T>)
+    ensures FoldRight(f, xs + ys, init) == FoldRight(f, xs, FoldRight(f, ys, init))
+  {
+    if |xs| == 0 {
+      assert xs + ys == ys;
+    } else {
+      calc {
+        FoldRight(f, xs, FoldRight(f, ys, init));
+        f(xs[0], FoldRight(f, xs[1..], FoldRight(f, ys, init)));
+        f(xs[0], FoldRight(f, xs[1..] + ys, init));
+        { assert (xs + ys)[0] == xs[0];
+          assert (xs +ys)[1..] == xs[1..] + ys; }
+        FoldRight(f, xs + ys, init);
+      }
+    }
+  }
 }
