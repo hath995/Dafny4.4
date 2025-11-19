@@ -28,6 +28,124 @@ module SeqFunctions {
         }
     }
 
+    // function MapRecHelper<T,R>(f: (T -> R), xs: seq<T>, acc: seq<R>, ghost start: seq<T>, ghost i: nat): seq<R> 
+    //   requires i <= |start|
+    //   requires |acc| == i
+    //   requires xs == start[i..]
+    //   requires forall i :: 0 <= i < |acc| ==> acc[i] == f(start[i])
+    //   ensures forall i :: 0 <= i < |acc| ==> acc[i] == f(start[i])
+    //   ensures |xs|+|acc| == |MapRecHelper(f, xs, acc, start, i)|
+    //   // ensures forall i :: 0 <= i < |MapRecHelper(f, xs, acc)| ==> MapRecHelper(f, xs, acc)[i] == f(xs[i])
+    // {
+    //   if xs == [] then acc else MapRecHelper(f, xs[1..], acc+[f(xs[0])], start, i+1)
+    // }
+
+    // function MapRec<T,R>(f: (T -> R), xs: seq<T>): seq<R> 
+    //   ensures |MapRec(f, xs)| == |MapRecHelper(f, xs, [], xs, 0)|
+    //   ensures |xs| == |MapRec(f, xs)|
+    //   ensures forall i :: 0 <= i < |xs| ==> MapRec(f, xs)[i] == f(xs[i])
+
+    // {
+    //   MapRecHelper(f, xs, [], xs, 0)
+    // }
+
+    // method {:test} mapRec() {
+    //   var vals := [1,2,3,4];
+    //   var res := MapRec(x => x+3, vals);
+    //   print "\nmapRec: ";
+    //   print res;
+    // }
+
+    // lemma MapEquivalence<T,R>(f: (T -> R), xs: seq<T>)
+    //   ensures MapRec(f, xs) == Map(f, xs)
+    // {
+    //   if xs == [] {
+
+    //   }else{
+    //     assert xs == [xs[0]]+xs[1..];
+    //     MapEquivalence(f, xs[1..]);
+    //   }
+    // }
+
+
+function fmap_orig<A,B>(s1:seq<A>,f:A->B): seq<B>
+  ensures |s1| == |fmap_orig(s1,f)|
+  ensures forall i :: 0 <= i < |fmap_orig(s1,f)| ==> fmap_orig(s1,f)[i] == f(s1[i])
+{
+  if |s1| == 0
+    then []
+    else [f(s1[0])] + fmap_orig(s1[1..],f)
+}
+
+function fmap<A,B>(s1:seq<A>,f:A->B): seq<B>
+  ensures |s1| == |fmap(s1,f)|
+{
+  fmap_tc([],s1,f)
+}
+
+function fmap_tc<A,B>(acc:seq<B>,s1:seq<A>,f:A->B): seq<B>
+  decreases s1
+  ensures |fmap_tc(acc,s1,f)| == |s1|+|acc|
+{
+  if |s1| == 0
+    then acc
+  else
+    // Append to accumulator instead of prepending
+    fmap_tc(acc + [f(s1[0])], s1[1..], f)
+}
+
+lemma fmap_equiv<A,B>(f:A->B, xs:seq<A>)
+  ensures fmap(xs,f) == fmap_orig(xs,f)
+  ensures forall i :: 0 <= i < |fmap(xs,f)| ==> fmap(xs,f)[i] == f(xs[i])
+{
+  fmap_tc_correct([], xs, f);
+}
+
+function Id<A>(x: A): A {
+  x
+}
+
+lemma fmap_identity<A,B>(xs: seq<A>)
+  ensures fmap(xs, Id) == xs
+{
+  fmap_equiv(Id, xs);
+}
+
+function Compose<A,B,C>(f: B->C, g: A->B): A->C {
+  (x:A) => f(g(x))
+}
+
+lemma fmap_compose<A,B,C>(f: B->C, g: A->B, xs: seq<A>)
+  ensures fmap(fmap(xs, g),f) == fmap(xs, Compose(f,g))
+{
+  fmap_equiv(Compose(f,g), xs);
+  fmap_equiv(g, xs);
+  fmap_equiv(f, fmap(xs, g));
+}
+
+// Helper lemma to prove the tail-recursive version correct
+lemma fmap_tc_correct<A,B>(acc:seq<B>, xs:seq<A>, f:A->B)
+  ensures fmap_tc(acc, xs, f) == acc + fmap_orig(xs, f)
+  decreases |xs|
+{
+  if |xs| == 0 {
+    // Base case: fmap_tc(acc, [], f) == acc == acc + []
+  } else {
+    // Inductive case
+    calc {
+      fmap_tc(acc, xs, f);
+    == // by definition of fmap_tc
+      fmap_tc(acc + [f(xs[0])], xs[1..], f);
+    == { fmap_tc_correct(acc + [f(xs[0])], xs[1..], f); }
+      (acc + [f(xs[0])]) + fmap_orig(xs[1..], f);
+    == // associativity of sequence concatenation
+      acc + ([f(xs[0])] + fmap_orig(xs[1..], f));
+    == // by definition of fmap_orig
+      acc + fmap_orig(xs, f);
+    }
+  }
+}
+
 function Filter<T>(f: (T -> bool), xs: seq<T>): (result: seq<T>)
     ensures |result| <= |xs|
     ensures forall i: nat :: i < |result| ==> f(result[i])
@@ -108,11 +226,15 @@ function Filter<T>(f: (T -> bool), xs: seq<T>): (result: seq<T>)
     }
   }
 
+  lemma LemmaFilterMapSwap<T(!new), U(!new)>(p: (U->bool), f: (T -> U), xs: seq<T>)
+    ensures Filter(p, Map(f,xs)) == Map(f, Filter(Compose(p,f), xs))
+  {}
+
   lemma FilteredInXS<T(!new)>(f: T -> bool, xs: seq<T>)
     ensures forall xx :: xx in Filter(f, xs) ==> xx in xs
   {}
 
-  lemma FilterTargets<T(!new)>(f: T -> bool, xs: seq<T>)
+  lemma {:isolate_assertions} FilterTargets<T(!new)>(f: T -> bool, xs: seq<T>)
     requires |Filter(f, xs)| > 1
     ensures exists i,j, m,n :: i != j && 0 <= i < j < |Filter(f, xs)| && m != n && 0 <= m < n < |xs| && f(xs[m]) && xs[m] == Filter(f, xs)[i] && f(xs[n]) && xs[n] == Filter(f, xs)[j]
   {
