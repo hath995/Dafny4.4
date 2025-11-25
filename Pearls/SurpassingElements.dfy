@@ -3,6 +3,7 @@ module SurpassingProblem {
   import opened SeqFunctions
   function Tails<T>(xs: seq<T>): seq<seq<T>>
     ensures forall xxs :: xxs in Tails(xs) ==> |xs| > 0
+    ensures |Tails(xs)| == |xs|
   {
     if xs == [] then
       []
@@ -10,7 +11,21 @@ module SurpassingProblem {
       [xs]+Tails(xs[1..])
   }
 
-  lemma TailsHas<T(==)>(xs: seq<T>, i: nat)
+  lemma TailsAtI<T>(xs: seq<T>, i: nat)
+    requires 0 <= i < |xs|
+    ensures Tails(xs)[i] == xs[i..]
+  {
+    if i == 0 {
+      assert xs[0..] == xs;
+    }else{
+      assert Tails(xs)[i] == Tails(xs[1..])[i-1];
+      TailsAtI(xs[1..], i-1);
+      assert xs[1..][i-1..] == xs[i..];
+      assert Tails(xs)[i] == xs[i..];
+    }
+  }
+
+  lemma TailsHas<T>(xs: seq<T>, i: nat)
     requires 0 <= i < |xs|
     ensures xs[i..] in Tails(xs)
   {
@@ -237,7 +252,7 @@ module SurpassingProblem {
   }
 
 
-  ghost function maxScount(xs: seq<int>): nat
+  function maxScount(xs: seq<int>): nat
     requires |xs| > 0
   {
     ThereIsAMaxScount(xs);
@@ -267,7 +282,7 @@ module SurpassingProblem {
     maximum(zzs)
   }
 
-  function Score(xs: seq<int>): nat requires |xs| > 0 { scount(xs[0], xs[1..], (a,b) => a < b) }
+  function Score(xs: seq<int>): nat { assume |xs| > 0; scount(xs[0], xs[1..], (a,b) => a < b) }
 
   lemma mscIsMaximum(xs: seq<int>)
     requires |xs| > 0
@@ -411,18 +426,170 @@ module SurpassingProblem {
   //     requires forall z :: z in Filter(y => cpm(xs[i..][0], z), xs[i..]) ==> cpm(xs[i..][0], z)
   // {}
 
-  function table(xs: seq<int>): seq<(int, nat)>
+  function table1(xs: seq<int>): seq<(int, nat)>
     requires |xs| > 1
   {
     Map((zs) => assume |zs| > 0;
           (zs[0], scount(zs[0], zs[1..], (a,b)=> a < b)), Filter(xxs => |xxs| > 0, Tails(xs)))
   }
 
-  function tcount(z: int, tys: seq<(int, nat)>): nat {
+  function tcount1(z: int, tys: seq<(int, nat)>): nat {
     scount(z, Map((x: (int, nat)) => x.0, tys), (a,b) => a < b)
   }
 
-  function join(txs: seq<(int, nat)>, tys: seq<(int, nat)>): seq<(int, nat)> {
-    Map((zc: (int,nat)) =>(zc.0, zc.1+tcount(zc.0, tys)), txs)+tys
+  function join1(txs: seq<(int, nat)>, tys: seq<(int, nat)>): seq<(int, nat)> {
+    Map((zc: (int,nat)) =>(zc.0, zc.1+tcount1(zc.0, tys)), txs)+tys
+  }
+
+
+  function table(xs: seq<int>): seq<(int, nat)> 
+    requires |xs| > 0
+    ensures |table(xs)| == |xs|
+  {
+    if |xs| == 1 then [(xs[0], 0)] else
+      var m := |xs|;
+      var n: nat := m / 2;
+      var ys := xs[..n];
+      var zs := xs[n..];
+      assert n < m;
+      join(m-n, table(ys), table(zs))
+  }
+
+  lemma TableLengthGTZ(xs: seq<int>)
+    requires |xs| > 0
+    ensures |table(xs)| > 0
+  {}
+
+  function join(n: nat, txs: seq<(int, nat)>, tys: seq<(int, nat)>): seq<(int, nat)>
+    requires n == |tys|
+    ensures |join(n, txs, tys)| == |txs|+|tys|
+  {
+    if n == 0 && tys == [] then txs 
+    else if txs == [] then tys
+    else 
+      var (x,c) := txs[0];
+      var (y,d) := tys[0];
+      if x < y then [(x, c+n)]+ join(n, txs[1..], tys) else [(y,d)]+join(n-1, txs, tys[1..])
+  }
+
+  function snd(p: (int, nat)): nat {
+    p.1
+  }
+
+  function msc2(xs: seq<int>): nat
+    requires |xs| > 0
+  {
+    TableLengthGTZ(xs);
+    maximum(Map(snd, table(xs)))
+  }
+
+ predicate sortedTuple(list: seq<(int, nat)>)
+  {
+    forall i,j :: 0 <= i < j < |list| ==> list[i].0 <= list[j].0
+  }
+
+  predicate sortedTupleRec(list: seq<(int, nat)>) {
+    if list == [] then true 
+    else 
+      // Compare list[0].0 with y.0
+      (forall y :: y in list[1..] ==> list[0].0 <= y.0) && sortedTupleRec(list[1..])
+  }
+
+  lemma sortedDefsAreEquivalent(list: seq<(int, nat)>)
+    ensures sortedTupleRec(list) <==> sortedTuple(list)
+  {
+    if list == [] {
+      // Base case holds trivially
+    } else {
+      // Inductive step: assume it holds for the tail
+      sortedDefsAreEquivalent(list[1..]);
+
+      if sortedTupleRec(list) {
+        // Forward direction: Rec => Quantified
+        forall i, j | 0 <= i < j < |list|
+          ensures list[i].0 <= list[j].0
+        {
+          if i == 0 {
+            // list[0] is smaller than everything in tail (by Rec def)
+            // list[j] is in tail
+            assert list[j] in list[1..]; 
+            assert list[0].0 <= list[j].0; 
+          } else {
+             // Both i and j are in tail, handled by recursive call
+          }
+        }
+      } 
+      
+      if !sortedTupleRec(list) {
+        // Reverse direction by contradiction/contrapositive
+        if !sortedTupleRec(list[1..]) {
+           // If tail is not sorted, list is not sorted
+           assert !sortedTuple(list[1..]);
+           // Use the witness from the tail to prove list is not sorted
+           var i, j :| 0 <= i < j < |list[1..]| && list[1..][i].0 > list[1..][j].0;
+           assert list[i+1].0 > list[j+1].0; // Shift indices by 1
+           assert !sortedTuple(list);
+        } else {
+           // Tail is sorted, so the violation must be the head check
+           assert !(forall y :: y in list[1..] ==> list[0].0 <= y.0);
+           
+           // Extract the witness y that violates the head check
+           var y :| y in list[1..] && list[0].0 > y.0;
+           
+           // Find the index of y to satisfy the 'sorted' quantifier format
+           var k :| 0 <= k < |list[1..]| && list[1..][k] == y;
+           
+           // Construct the counter-example indices for sorted(list)
+           assert 0 < k+1 < |list|;
+           assert list[0].0 > list[k+1].0;
+           assert !sortedTuple(list);
+        }
+      }
+    }
+  }
+
+  function fst(p: (int, nat)): int { p.0 }
+  predicate IsTablePermutation(xs: seq<int>, t: seq<(int, nat)>) {
+    // 1. It is a permutation of values
+    multiset(xs) == multiset(Map(fst, t)) &&
+    sortedTupleRec(t) &&
+    // 2. The counts are correct
+    forall i :: 0 <= i < |t| ==> 
+       exists k :: 0 <= k < |xs| && xs[k] == t[i].0 && t[i].1 == Score(xs[k..])
+  }
+
+  lemma {:isolate_assertions} JoinAddsPermutations(n: nat, txs: seq<(int, nat)>, tys: seq<(int, nat)>, xs: seq<int>, ys: seq<int>)
+    requires n == |tys|
+    requires IsTablePermutation(xs, txs)
+    requires IsTablePermutation(ys, tys)
+    ensures IsTablePermutation(xs+ys, join(n, txs, tys))
+  {
+    if tys == [] {
+      assert xs+ys == xs;
+      assert join(n, txs, tys) == txs;
+    assert IsTablePermutation(xs+ys, join(n, txs, tys));
+    }else if txs == [] {
+
+      assert xs+ys == ys;
+      assert join(n, txs, tys) == tys;
+    assert IsTablePermutation(xs+ys, join(n, txs, tys));
+    }else{
+
+    assert IsTablePermutation(xs+ys, join(n, txs, tys));
+    }
+  }
+
+
+
+  method {:test} Test() {
+    //G E N E R A T I N G
+    var sample := [ 71, 69, 78, 69, 82, 65, 84, 73, 78, 71 ];
+    print "\ntable: " , table(sample);
+    print "\n", msc(sample);
+    print "\n", msc2(sample);
+    var sample2 := [ 91, 14, 59, 4, 56, 100, 94, 28, 87, 90, 34, 33, 21, 81, 1, 51, 11, 68, 19, 57, 39, 76];
+    print "\ntable: " , table(sample2);
+    print "\n", msc(sample2);
+    print "\n", msc2(sample2);
   }
 }
